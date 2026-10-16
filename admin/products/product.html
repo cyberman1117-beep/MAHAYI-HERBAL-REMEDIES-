@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="View and manage a product.">
+  <title>Product | Clothing Store Admin</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <script type="module" src="../../assets/js/firebase-auth.js"></script>
+  <script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#product-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+
+  <main id="product-main" class="admin-main"><div class="container">
+    <div class="settings-heading">
+      <div><p class="eyebrow">Catalogue management</p><h1 data-product-title>Product</h1><p class="muted">View the complete product information and edit it when needed.</p></div>
+      <div>
+        <a class="button button-outline" href="./">Back to Products</a>
+        <a class="button button-outline" href="./group.html" data-back-to-group hidden>Back to Group</a>
+        <a class="button button-outline" href="../categories/promotions.html">Promotion</a>
+        <a class="button button-outline" href="../categories/new-arrivals.html">New Arrival</a>
+        <button class="button button-primary" type="button" data-edit-product>Edit Product</button>
+      </div>
+    </div>
+
+    <section class="settings-panel" data-view-panel aria-labelledby="product-details-title">
+      <div class="settings-heading"><div><h2 id="product-details-title">Product details</h2><p class="muted" data-product-meta>Loading…</p></div></div>
+      <div class="settings-fields settings-fields-two" data-product-details></div>
+      <div class="settings-group" data-product-images-group hidden><legend>Pictures</legend><p class="muted">The main picture is used first on the storefront. Choose another picture as the main picture when needed.</p><div class="product-image-management" data-product-images></div></div>
+      <div class="settings-group" data-product-variants-group hidden><legend>Variants</legend><div class="product-detail-variants" data-product-variants></div></div>
+    </section>
+
+    <section class="settings-panel" data-edit-panel hidden aria-labelledby="edit-product-title">
+      <div class="settings-heading"><div><h2 id="edit-product-title">Edit product</h2><p class="muted">Update this product and save the changes.</p></div></div>
+      <form class="settings-form" data-product-form>
+        <input type="hidden" name="id">
+        <fieldset class="settings-group"><legend>Product details</legend>
+          <div class="settings-fields settings-fields-two">
+            <label class="field"><span>Product name</span><input name="name" type="text" required maxlength="160"></label>
+            <label class="field"><span>SKU</span><input name="sku" type="text" maxlength="80"></label>
+            <label class="field"><span>Product group</span><select name="product_group_id"><option value="">No group</option></select></label>
+            <label class="field"><span>Group option</span><select name="product_group_option_id" disabled><option value="">No group option</option></select><small class="muted" data-group-option-help>Select a group first.</small></label>
+            <label class="field"><span>Category</span><select name="category_id"><option value="">Uncategorized</option></select></label>
+            <label class="field"><span>Status</span><select name="status"><option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option></select></label>
+            <label class="field"><span>Price (ZAR)</span><input name="price" type="number" min="0" step="0.01" inputmode="decimal"></label>
+            <label class="field"><span>Stock quantity</span><input name="stock_quantity" type="number" min="0" step="1" inputmode="numeric"></label>
+            <label class="field"><span>Sort order</span><input name="sort_order" type="number" min="0" step="1" inputmode="numeric"></label>
+            <label class="field"><span><input name="track_stock" type="checkbox"> Track stock</span></label>
+            <label class="field field-wide"><span>Description</span><textarea name="description" rows="6" maxlength="5000"></textarea></label>
+            <label class="field field-wide"><span>Add pictures</span><input name="images" type="file" accept="image/*" multiple><small class="muted">Existing pictures are kept. New pictures are added.</small></label>
+          </div>
+        </fieldset>
+        <div data-product-shipping-mount></div>
+        <div class="settings-actions"><span class="settings-load-status" data-form-status aria-live="polite">Ready to edit.</span><div><button class="button button-outline" type="button" data-cancel-edit>Cancel</button> <button class="button button-primary" type="submit">Save changes</button></div></div>
+      </form>
+    </section>
+  </div></main>
+
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">Clothing Store</a><p>© <span data-current-year>2026</span> Clothing Store</p><a href="./">Back to Products</a></div></footer>
+
+  <script type="module">
+    import { createProductShippingController } from "../../assets/js/product-shipping-form.js";
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+    const groupId = params.get('group_id');
+    const backToGroup = document.querySelector('[data-back-to-group]');
+    if (groupId && /^\d+$/.test(groupId)) {
+      backToGroup.href = './group.html?id=' + encodeURIComponent(groupId);
+      backToGroup.hidden = false;
+    }
+    const viewPanel = document.querySelector('[data-view-panel]');
+    const editPanel = document.querySelector('[data-edit-panel]');
+    const title = document.querySelector('[data-product-title]');
+    const meta = document.querySelector('[data-product-meta]');
+    const details = document.querySelector('[data-product-details]');
+    const imagesGroup = document.querySelector('[data-product-images-group]');
+    const imagesList = document.querySelector('[data-product-images]');
+    const variantsGroup = document.querySelector('[data-product-variants-group]');
+    const variantsList = document.querySelector('[data-product-variants]');
+    const editButton = document.querySelector('[data-edit-product]');
+    const form = document.querySelector('[data-product-form]');
+    const productGroupSelect = form.elements.product_group_id;
+    const productGroupOptionSelect = form.elements.product_group_option_id;
+    const groupOptionHelp = document.querySelector('[data-group-option-help]');
+    const cancelButton = document.querySelector('[data-cancel-edit]');
+    const status = document.querySelector('[data-form-status]');
+    const imageInput = form.elements.images;
+    const shippingController = createProductShippingController({ form, apiFetch });
+    let product = null;
+
+    function setStatus(message) {
+      status.textContent = String(message || '');
+    }
+    let existingImages = [];
+    let productGroups = [];
+    async function getToken() {
+      if (typeof window.getAdminIdToken !== 'function') throw new Error('Admin authentication is still loading.');
+      const token = await window.getAdminIdToken();
+      if (!token) throw new Error('Authentication required. Please sign in again.');
+      return token;
+    }
+
+    async function apiFetch(url, options = {}) {
+      const token = await getToken();
+      const headers = new Headers(options.headers || {});
+      headers.set('Authorization', 'Bearer ' + token);
+      if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+      const response = await fetch(url, { ...options, headers });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) throw new Error(payload.error || 'Request failed.');
+      return payload;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[character]));
+    }
+
+    function getSelectedGroup() {
+      return productGroups.find((group) => String(group.id) === String(productGroupSelect.value)) || null;
+    }
+
+    async function loadProductGroups() {
+      const result = await apiFetch('/api/product-groups');
+      productGroups = Array.isArray(result.data) ? result.data : [];
+      productGroupSelect.innerHTML = '<option value="">No group</option>';
+      for (const group of productGroups) {
+        const option = document.createElement('option');
+        option.value = group.id;
+        option.textContent = group.name + ' (' + (group.relationship_type === 'size' ? 'Size' : 'Color') + ')';
+        productGroupSelect.append(option);
+      }
+      updateProductGroupOptions();
+    }
+    function updateProductGroupOptions(selectedId = '') {
+      const group = productGroups.find((item) => String(item.id) === String(productGroupSelect.value));
+      productGroupOptionSelect.innerHTML = '<option value="">No group option</option>';
+      productGroupOptionSelect.disabled = !group;
+      if (!group) { groupOptionHelp.textContent = 'Select a group first.'; return; }
+      groupOptionHelp.textContent = 'Choose the predefined option for this product.';
+      for (const option of (group.options || [])) {
+        const item = document.createElement('option');
+        item.value = option.id; item.textContent = option.value + (option.sku ? ' · ' + option.sku : '');
+        if (String(option.id) === String(selectedId)) item.selected = true;
+        productGroupOptionSelect.append(item);
+      }
+    }
+    productGroupSelect.addEventListener('change', () => updateProductGroupOptions());
+    async function loadCategories() {
+      const response = await fetch('/api/categories', { headers: { Accept: 'application/json' }, cache: 'no-store' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) throw new Error(payload.error || 'Unable to load categories.');
+      const categories = Array.isArray(payload.data) ? payload.data : [];
+      const select = form.elements.category_id;
+      select.innerHTML = '<option value="">Uncategorized</option>';
+      for (const category of categories.filter((item) => Number(item.is_enabled) === 1).sort((a,b) => String(a.name).localeCompare(String(b.name)))) {
+        const option = document.createElement('option');
+        option.value = category.id;
+        option.textContent = category.name;
+        select.append(option);
+      }
+    }
+
+    async function loadProduct() {
+      if (!id || !/^\d+$/.test(id)) throw new Error('A valid product was not specified.');
+      const statuses = ['active', 'draft', 'archived'];
+      product = null;
+      for (const itemStatus of statuses) {
+        const result = await apiFetch('/api/products?id=' + encodeURIComponent(id) + '&status=' + itemStatus);
+        const found = (result.data?.products || []).find((item) => String(item.id) === id);
+        if (found) {
+          product = found;
+          break;
+        }
+      }
+      if (!product) throw new Error('Product not found.');
+      renderProduct();
+    }
+
+    function renderProduct() {
+      title.textContent = product.name;
+      meta.textContent = (product.category_name || 'Uncategorized') + ' · ' + product.status + ' · ' + product.currency + ' ' + Number(product.price).toFixed(2);
+      const rows = [
+        ['Product ID', product.id],
+        ['SKU', product.sku || '—'],
+        
+        ['Product group', product.product_group_name ? product.product_group_name + (product.product_group_option_value ? ' · ' + product.product_group_option_value : '') : '—'],
+        ['Category', product.category_name || 'Uncategorized'],
+        ['Status', product.status],
+        ['Price', product.currency + ' ' + Number(product.price).toFixed(2)],
+        ['Stock', product.track_stock ? product.stock_quantity : 'Stock tracking off'],
+        ['Sort order', product.sort_order],
+        ['Created', product.created_at || '—'],
+        ['Last updated', product.updated_at || '—']
+      ];
+      details.innerHTML = rows.map(([label, value]) => '<div class="settings-readonly"><strong>' + escapeHtml(label) + '</strong><br>' + escapeHtml(value) + '</div>').join('');
+      if (product.description) {
+        const description = document.createElement('div');
+        description.className = 'field field-wide';
+        description.innerHTML = '<span>Description</span><p class="muted">' + escapeHtml(product.description) + '</p>';
+        details.append(description);
+      }
+
+      existingImages = Array.isArray(product.images) ? product.images.map((image, index) => ({ ...image, sort_order:Number(image.sort_order ?? index), is_primary:Number(image.is_primary) === 1 })) : [];
+      imagesList.innerHTML = existingImages.length ? existingImages.map((image, index) => '<div class="product-image-management-item"><div class="product-image-management-preview"><img src="' + escapeHtml(image.image_url) + '" alt="' + escapeHtml(image.alt_text || product.name) + '"></div><label><input type="radio" name="primary-image" value="' + index + '"' + (image.is_primary ? ' checked' : '') + '> <span class="product-image-management-main">Main picture</span></label></div>').join('') : '<p class="muted">No pictures.</p>';
+      imagesGroup.hidden = !existingImages.length;
+
+      const variants = Array.isArray(product.variants) ? product.variants : [];
+      variantsList.innerHTML = variants.length ? variants.map((variant) => '<div class="settings-readonly"><strong>' + escapeHtml(variant.name || 'Variant') + '</strong><br>SKU: ' + escapeHtml(variant.sku || '—') + ' · Stock: ' + escapeHtml(variant.stock_quantity) + (variant.price_override !== null && variant.price_override !== undefined ? ' · Price: ' + escapeHtml(product.currency) + ' ' + Number(variant.price_override).toFixed(2) : '') + '</div>').join('') : '<p class="muted">No variants.</p>';
+      variantsGroup.hidden = !variants.length;
+    }
+
+    function populateForm() {
+      form.elements.name.value = product.name || '';
+      form.elements.sku.value = product.sku || '';
+      productGroupSelect.value = product.product_group_id || '';
+      updateProductGroupOptions(product.product_group_option_id || '');
+      form.elements.category_id.value = product.category_id || '';
+      form.elements.status.value = product.status || 'draft';
+      form.elements.price.value = product.price ?? 0;
+      form.elements.stock_quantity.value = product.stock_quantity ?? 0;
+      form.elements.sort_order.value = product.sort_order ?? 0;
+      form.elements.track_stock.checked = Boolean(product.track_stock);
+      form.elements.description.value = product.description || '';
+      existingImages = Array.isArray(product.images) ? product.images.map((image,index)=>({...image,sort_order:Number(image.sort_order ?? index),is_primary:Number(image.is_primary) === 1})) : [];
+      imageInput.value = '';
+    }
+
+    async function uploadImage(file) {
+      const data = new FormData();
+      data.append('file', file, file.name);
+      const result = await apiFetch('/api/upload-image', { method:'POST', body:data });
+      return result.data;
+    }
+
+
+    editButton.addEventListener('click', async () => {
+      populateForm();
+      viewPanel.hidden = true;
+      editPanel.hidden = false;
+      editButton.hidden = true;
+      form.elements.name.focus();
+      setStatus('Loading categories and product groups…');
+      try {
+        await Promise.all([loadCategories(), loadProductGroups(), shippingController.load(product.id)]);
+        populateForm();
+        setStatus('Editing this product.');
+      } catch (error) {
+        setStatus('Editing is available, but some catalogue options could not be loaded: ' + error.message);
+      }
+    });
+
+    cancelButton.addEventListener('click', () => {
+      renderProduct();
+      editPanel.hidden = true;
+      viewPanel.hidden = false;
+      editButton.hidden = false;
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const files = Array.from(form.elements.images.files || []);
+      const data = {
+        name: form.elements.name.value.trim(),
+        sku: form.elements.sku.value.trim(),
+        product_group_id: productGroupSelect.value || null,
+        product_group_option_id: productGroupOptionSelect.value || null,
+        category_id: form.elements.category_id.value || null,
+        status: form.elements.status.value,
+        price: Number(form.elements.price.value || 0),
+        stock_quantity: Number(form.elements.stock_quantity.value || 0),
+        sort_order: Number(form.elements.sort_order.value || 0),
+        track_stock: form.elements.track_stock.checked,
+        description: form.elements.description.value.trim()
+      };
+      if (!data.name) return setStatus('Product name is required.');
+      const saveButton = form.querySelector('button[type="submit"]');
+      saveButton.disabled = true;
+      setStatus('Saving changes…');
+      try {
+        let images = [...existingImages];
+        for (let index = 0; index < files.length; index += 1) {
+          setStatus('Uploading picture ' + (index + 1) + ' of ' + files.length + '…');
+          const uploaded = await uploadImage(files[index]);
+          images.push({ image_url:uploaded.image_url, cloudinary_public_id:uploaded.cloudinary_public_id, alt_text:data.name, sort_order:images.length, is_primary:false });
+        }
+        const selectedPrimary = Number(document.querySelector('input[name="primary-image"]:checked')?.value ?? -1);
+        if (selectedPrimary >= 0 && selectedPrimary < images.length) {
+          images = images.map((image, index) => ({ ...image, sort_order:index, is_primary:index === selectedPrimary }));
+        } else {
+          images = images.map((image, index) => ({ ...image, sort_order:index, is_primary:Boolean(image.is_primary) }));
+        }
+        data.images = images;
+        await apiFetch('/api/products?id=' + encodeURIComponent(product.id), { method:'PUT', body:JSON.stringify(data) });
+        await shippingController.save(product.id);
+        const refreshed = await apiFetch('/api/products?status=' + encodeURIComponent(data.status) + '&limit=100');
+        product = (refreshed.data?.products || []).find((item) => String(item.id) === String(id));
+        if (!product) throw new Error('Product was saved, but could not be reloaded.');
+        renderProduct();
+        editPanel.hidden = true;
+        viewPanel.hidden = false;
+        editButton.hidden = false;
+        setStatus('Changes saved.');
+      } catch (error) {
+        setStatus(error.message);
+      } finally {
+        saveButton.disabled = false;
+      }
+    });
+
+    try {
+      await loadProduct();
+    } catch (error) {
+      title.textContent = 'Product unavailable';
+      meta.textContent = error.message;
+      editButton.hidden = true;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Clothing Store administration dashboard.">
+  <title>Admin | Clothing Store</title>
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <script type="module" src="../assets/js/firebase-auth.js"></script>
+  <script src="../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#admin-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner"><a class="brand" href="../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+  <main id="admin-main" class="admin-main"><div class="container">
+    <div class="admin-intro"><div><p class="eyebrow">Store control center</p><h1>Dashboard</h1><p class="muted">Manage your storefront from one place.</p></div><span class="admin-status">Setup in progress</span></div>
+    <section class="admin-stats" aria-label="Store overview"><div class="stat-card"><span class="muted">Products</span><strong>—</strong><small>Coming soon</small></div><div class="stat-card"><span class="muted">Orders</span><strong>—</strong><small>Coming soon</small></div><div class="stat-card"><span class="muted">Store status</span><strong>Draft</strong><small>Configuration needed</small></div></section>
+    <div class="admin-sections">
+      <section class="admin-panel" id="products"><div class="panel-icon">01</div><div><h2>Products</h2><p class="muted">Add, edit, organize, and manage inventory for your products.</p></div><a class="button button-outline" href="products/">Manage products</a></section>
+      <section class="admin-panel" id="categories"><div class="panel-icon">02</div><div><h2>Categories</h2><p class="muted">Create, organize, enable, disable, and manage the categories used by your products.</p></div><a class="button button-outline" href="categories/">Manage categories</a></section>
+      <section class="admin-panel" id="orders"><div class="panel-icon">03</div><div><h2>Orders</h2><p class="muted">Review customer orders and keep fulfillment details up to date.</p></div><a class="button button-outline" href="orders/">View orders</a></section>
+      <section class="admin-panel" id="customers"><div class="panel-icon">04</div><div><h2>Customers</h2><p class="muted">View and manage customer information saved from the public storefront.</p></div><a class="button button-outline" href="customers/">Manage customers</a></section>
+      <section class="admin-panel" id="settings"><div class="panel-icon">05</div><div><h2>Store settings</h2><p class="muted">Configure store details, social links, and future integrations.</p></div><a class="button button-outline" href="settings/">Open settings</a></section><section class="admin-panel" id="communications"><div class="panel-icon">06</div><div><h2>Communications</h2><p class="muted">Read and reply to customer live-chat conversations.</p></div><a class="button button-outline" href="communications/">Open communications</a></section><section class="admin-panel" id="shipping"><div class="panel-icon">07</div><div><h2>Shipping</h2><p class="muted">Configure local delivery areas, manual PAXI rates, and future courier integrations.</p></div><a class="button button-outline" href="shipping/">Manage shipping</a></section><section class="admin-panel" id="information"><div class="panel-icon">08</div><div><h2>Information Pages</h2><p class="muted">Update customer-facing policies, terms, shipping information, and other store pages.</p></div><a class="button button-outline" href="content/">Manage information pages</a></section><section class="admin-panel" id="seo"><div class="panel-icon">09</div><div><h2>SEO / Search Engine</h2><p class="muted">Manage search visibility, indexing, and search-engine metadata for the storefront.</p></div><a class="button button-outline" href="seo/">Manage SEO</a></section>
+    </div>
+  </div></main>
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../index.html">Clothing Store</a><p>© <span data-current-year>2026</span> Clothing Store</p><a href="../index.html">View storefront</a></div></footer>
+</body>
+</html>

@@ -1,0 +1,3 @@
+-- Superseded by migrations/0018_product_shipping_data.sql.
+-- The product_shipping table is the canonical optional shipping store.
+-- This legacy duplicate migration intentionally contains no executable SQL.

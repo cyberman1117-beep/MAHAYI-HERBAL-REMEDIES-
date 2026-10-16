@@ -1,0 +1,37 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Packaging | Clothing Store Admin</title><link rel="stylesheet" href="../../assets/css/styles.css"><script type="module" src="../../assets/js/firebase-auth.js"></script><script src="../../assets/js/site.js" defer></script></head><body class="admin-page"><header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span data-admin-account>Admin account</span><button class="button button-small button-outline" data-admin-logout>Log out</button></div></div></header><main class="admin-main"><div class="container">
+<div class="settings-heading">
+  <div><p class="eyebrow">Shipping configuration</p><h1>Packaging</h1><p class="muted">Define the bags, boxes, envelopes and other packaging used by the packing engine.</p></div>
+  <div><a class="button button-outline" href="./index.html">Back to Shipping</a> <a class="button button-primary" href="./packaging-detail.html">Add packaging</a></div>
+</div>
+<section class="settings-panel">
+<div class="admin-sections" data-list><p class="muted">Loading packaging…</p></div>
+</section>
+</div></main>
+<script type="module">
+async function getToken(){
+  if(typeof window.getAdminIdToken!=="function") throw new Error("Admin authentication is still loading.");
+  const token=await window.getAdminIdToken();
+  if(!token) throw new Error("Authentication required. Please sign in again.");
+  return token;
+}
+async function api(url,options={}){
+  const token=await getToken();
+  const headers=new Headers(options.headers||{});
+  headers.set("Authorization","Bearer "+token);
+  const response=await fetch(url,{...options,headers});
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok||!payload.success) throw new Error(payload.error||"Request failed.");
+  return payload;
+}
+const list=document.querySelector("[data-list]");
+const esc=value=>String(value??"").replace(/[&<>'"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[ch]));
+async function load(){
+  try{
+    const result=await api("/api/shipping?include_disabled=1");
+    const packaging=result.packaging||[];
+    list.innerHTML=packaging.map(item=>'<a class="admin-panel" href="./packaging-detail.html?id='+encodeURIComponent(item.id)+'"><div><h2>'+esc(item.name)+'</h2><p class="muted">'+esc(item.packaging_type)+' · '+(item.length_cm!==null?item.length_cm+" × "+item.width_cm+" × "+item.height_cm+" cm":"Dimensions not set")+' · Max '+(item.max_weight_kg===null?"not set":item.max_weight_kg+" kg")+' · Stock '+Number(item.stock_quantity||0)+' · '+(Number(item.is_enabled)?"Enabled":"Disabled")+'</p></div><span class="button button-outline">Edit</span></a>').join("")||'<p class="muted">No packaging configured yet.</p>';
+  }catch(error){list.innerHTML='<p class="muted">'+esc(error.message)+'</p>';}
+}
+load();
+</script>
+</body></html>

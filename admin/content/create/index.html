@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New Information Page | Clothing Store Admin</title>
+<link rel="stylesheet" href="../../../assets/css/styles.css">
+<script type="module" src="../../../assets/js/firebase-auth.js"></script>
+<script src="../../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+<header class="admin-header"><div class="container header-inner"><a class="brand" href="../../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+<main class="admin-main"><div class="container">
+<div class="settings-heading">
+  <div><p class="eyebrow">Store content</p><h1>New Information Page</h1><p class="muted">Create a customer-facing policy or information page.</p></div>
+  <a class="button button-outline" href="../">Back to Information Pages</a>
+</div>
+<section class="settings-panel">
+<form class="settings-form" data-form>
+<div class="settings-fields settings-fields-two">
+<label class="field"><span>Page title</span><input name="title" required maxlength="160"></label>
+<label class="field"><span>Page slug</span><input name="slug" maxlength="120" placeholder="shipping-policy"></label>
+<label class="field"><span>Sort order</span><input name="sort_order" type="number" min="0" step="1" value="0"></label>
+<label class="field"><span><input name="is_published" type="checkbox"> Published</span></label>
+<label class="field" style="grid-column:1/-1"><span>Page content</span><textarea name="content" rows="18" placeholder="Write the information customers should see…" style="width:100%;resize:vertical"></textarea></label>
+</div>
+<div class="settings-actions"><span class="settings-load-status" data-status>Ready.</span><button class="button button-primary" type="submit" data-save>Create page</button></div>
+</form>
+</section>
+</div></main>
+<script src="../../../assets/js/content-create.js" defer></script>
+</body>
+</html>

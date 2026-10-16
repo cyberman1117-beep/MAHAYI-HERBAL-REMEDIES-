@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Manage customers for the Clothing Store.">
+  <title>Customers | Clothing Store Admin</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <script type="module" src="../../assets/js/firebase-auth.js"></script>
+  <script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#customers-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+  <main id="customers-main" class="admin-main"><div class="container">
+    <div class="settings-heading">
+      <div><p class="eyebrow">Customer management</p><h1>Customers</h1><p class="muted">View and update customer information saved from the public storefront.</p></div>
+      <a class="button button-outline" href="../">Back to dashboard</a>
+    </div>
+
+    <section class="settings-panel">
+      <div class="settings-heading"><div><h2>Customer list</h2><p class="muted">These records come directly from the shared customer database.</p></div><button class="button button-outline" type="button" data-refresh>Refresh</button></div>
+      <form class="search-row" data-search-form>
+        <label class="sr-only" for="customer-search">Search customers</label>
+        <input id="customer-search" name="search" type="search" placeholder="Search by name, email, phone, or city">
+        <button class="button button-outline" type="submit">Search</button>
+      </form>
+      <div class="settings-notice" data-list-status role="status">Loading customers…</div>
+      <div class="admin-sections" data-customer-list></div>
+    </section>
+
+    <section class="settings-panel" data-editor hidden>
+      <div class="settings-heading"><div><h2>Edit customer</h2><p class="muted">Changes update the same customer record used by the public Account page.</p></div><button class="button button-outline" type="button" data-close-editor>Close</button></div>
+      <form class="settings-form" data-customer-form>
+        <input type="hidden" name="firebase_uid">
+        <div class="settings-fields settings-fields-two">
+          <label class="field"><span>Email</span><input name="email" type="email" required></label>
+          <label class="field"><span>Full name</span><input name="full_name" type="text" required></label>
+          <label class="field"><span>Phone</span><input name="phone" type="tel" required></label>
+          <label class="field"><span>Address</span><input name="address" type="text" required></label>
+          <label class="field"><span>City</span><input name="city" type="text" required></label>
+          <label class="field"><span>Province</span><input name="province" type="text" required></label>
+          <label class="field"><span>Postal code</span><input name="postal_code" type="text" required></label>
+          <label class="field"><span>Country</span><input name="country" type="text" required value="South Africa"></label>
+          <label class="field"><span>Account status</span><input name="status" type="text" readonly></label>
+          <label class="field"><span>Suspension reason</span><input name="suspension_reason" type="text" readonly></label>
+        </div>
+        <div class="settings-actions">
+          <span class="settings-load-status" data-form-status>Ready.</span>
+          <button class="button button-primary" type="submit">Save customer</button>
+          <button class="button button-outline" type="button" data-suspend-customer>Suspend</button>
+          <button class="button button-outline" type="button" data-restore-customer hidden>Restore</button>
+        </div>
+      </form>
+    </section>
+  </div></main>
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">Clothing Store</a><p>© <span data-current-year>2026</span> Clothing Store</p><a href="../">Back to dashboard</a></div></footer>
+
+<script type="module">
+const list = document.querySelector('[data-customer-list]');
+const listStatus = document.querySelector('[data-list-status]');
+const searchForm = document.querySelector('[data-search-form]');
+const refreshButton = document.querySelector('[data-refresh]');
+const editor = document.querySelector('[data-editor]');
+const form = document.querySelector('[data-customer-form]');
+const formStatus = document.querySelector('[data-form-status]');
+const closeEditor = document.querySelector('[data-close-editor]');
+let customers = [];
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[character]));
+}
+
+async function getToken() {
+  if (typeof window.getAdminIdToken !== 'function') throw new Error('Admin authentication is still loading.');
+  return window.getAdminIdToken();
+}
+
+async function apiFetch(url, options = {}) {
+  const token = await getToken();
+  const headers = new Headers(options.headers || {});
+  headers.set('Authorization', 'Bearer ' + token);
+  if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  const response = await fetch(url, { ...options, headers });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.success) throw new Error(payload.error || 'Request failed.');
+  return payload;
+}
+
+function renderCustomers() {
+  list.innerHTML = '';
+  if (!customers.length) {
+    list.innerHTML = '<p class="muted">No customers found.</p>';
+    return;
+  }
+  customers.forEach((customer, index) => {
+    const panel = document.createElement('section');
+    panel.className = 'admin-panel';
+    panel.innerHTML = `
+      <div class="panel-icon">${String(index + 1).padStart(2, '0')}</div>
+      <div>
+        <h2>${escapeHtml(customer.full_name || 'Unnamed customer')}</h2>
+        <p class="muted">${escapeHtml(customer.email)} · ${escapeHtml(customer.phone)}</p>
+        <p class="muted">${escapeHtml(customer.city)}, ${escapeHtml(customer.province)} · ${escapeHtml(customer.country)}</p>
+      </div>
+      <button class="button button-outline" type="button" data-edit="${escapeHtml(customer.firebase_uid)}">View / edit</button>`;
+    list.append(panel);
+  });
+}
+
+async function loadCustomers(search = '') {
+  listStatus.textContent = 'Loading customers…';
+  try {
+    const query = search.trim() ? '?search=' + encodeURIComponent(search.trim()) : '';
+    const payload = await apiFetch('/api/admin-customers' + query);
+    customers = Array.isArray(payload.data) ? payload.data : [];
+    renderCustomers();
+    listStatus.textContent = customers.length ? `${customers.length} customer${customers.length === 1 ? '' : 's'} loaded.` : 'No customers found.';
+  } catch (error) {
+    listStatus.textContent = error.message;
+  }
+}
+
+function openEditor(customer) {
+  editor.hidden = false;
+  Object.entries(customer).forEach(([name, value]) => {
+    const field = form.elements.namedItem(name);
+    if (field) field.value = value ?? '';
+  });
+  formStatus.textContent = 'Editing customer information.';
+  syncStatusControls(customer);
+  editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+list.addEventListener('click', (event) => {
+  const uid = event.target.closest('[data-edit]')?.dataset.edit;
+  if (!uid) return;
+  const customer = customers.find((item) => item.firebase_uid === uid);
+  if (customer) openEditor(customer);
+});
+
+searchForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  loadCustomers(searchForm.elements.search.value);
+});
+
+refreshButton.addEventListener('click', () => loadCustomers(searchForm.elements.search.value));
+closeEditor.addEventListener('click', () => { editor.hidden = true; });
+
+const suspendButton = editor.querySelector('[data-suspend-customer]');
+const restoreButton = editor.querySelector('[data-restore-customer]');
+
+function syncStatusControls(customer) {
+  const suspended = customer.status === 'suspended';
+  const statusField = form.elements.status;
+  const reasonField = form.elements.suspension_reason;
+  if (statusField) statusField.value = suspended ? 'Suspended' : 'Active';
+  if (reasonField) reasonField.value = customer.suspension_reason || '';
+  if (suspendButton) suspendButton.hidden = suspended;
+  if (restoreButton) restoreButton.hidden = !suspended;
+}
+
+async function changeCustomerStatus(action) {
+  const uid = form.elements.firebase_uid.value;
+  const customer = customers.find((item) => item.firebase_uid === uid);
+  if (!customer) return;
+
+  let reason = '';
+  if (action === 'suspend') {
+    reason = window.prompt('Enter the reason for suspending this customer:', customer.suspension_reason || '')?.trim() || '';
+    if (!reason) {
+      formStatus.textContent = 'Suspension cancelled. A reason is required.';
+      return;
+    }
+    if (!window.confirm('Suspend this customer? They will be blocked from using protected customer actions.')) return;
+  } else {
+    if (!window.confirm('Restore this customer and remove the suspension?')) return;
+  }
+
+  formStatus.textContent = action === 'suspend' ? 'Suspending…' : 'Restoring…';
+  try {
+    const payload = await apiFetch('/api/admin-customers', {
+      method: 'PUT',
+      body: JSON.stringify({
+        firebase_uid: uid,
+        action,
+        ...(action === 'suspend' ? { suspension_reason: reason } : {})
+      })
+    });
+    const updated = payload.data;
+    customers = customers.map((item) => item.firebase_uid === updated.firebase_uid ? updated : item);
+    renderCustomers();
+    openEditor(updated);
+    formStatus.textContent = action === 'suspend' ? 'Customer suspended successfully.' : 'Customer restored successfully.';
+  } catch (error) {
+    formStatus.textContent = error.message;
+  }
+}
+
+suspendButton?.addEventListener('click', () => changeCustomerStatus('suspend'));
+restoreButton?.addEventListener('click', () => changeCustomerStatus('restore'));
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!confirm('Update this customer information?')) return;
+  const data = Object.fromEntries(new FormData(form).entries());
+  formStatus.textContent = 'Saving…';
+  try {
+    const payload = await apiFetch('/api/admin-customers', { method: 'PUT', body: JSON.stringify(data) });
+    const updated = payload.data;
+    customers = customers.map((customer) => customer.firebase_uid === updated.firebase_uid ? updated : customer);
+    renderCustomers();
+    openEditor(updated);
+    formStatus.textContent = 'Customer information saved successfully.';
+  } catch (error) {
+    formStatus.textContent = error.message;
+  }
+});
+
+loadCustomers();
+</script>
+</body>
+</html>

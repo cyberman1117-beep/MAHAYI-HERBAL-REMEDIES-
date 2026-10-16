@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="View and manage a product group.">
+  <title>Product Group | Clothing Store Admin</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <script type="module" src="../../assets/js/firebase-auth.js"></script>
+  <script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#group-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+
+  <main id="group-main" class="admin-main"><div class="container">
+    <div class="settings-heading">
+      <div><p class="eyebrow">Catalogue management</p><h1 data-group-title>Product Group</h1><p class="muted" data-group-meta>Loading…</p></div>
+      <div><a class="button button-outline" href="./">Back to Products</a></div>
+    </div>
+
+    <section class="settings-panel" aria-labelledby="group-options-title">
+      <div class="settings-heading"><div><h2 id="group-options-title">Group options</h2><p class="muted">These options belong to the group. Products remain separate catalogue products.</p></div></div>
+      <div class="settings-fields settings-fields-two" data-group-details></div>
+      <div class="admin-sections" data-options-list></div>
+    </section>
+
+    <section class="settings-panel" aria-labelledby="group-add-product-title" data-group-product-form hidden>
+      <div class="settings-heading">
+        <div><h2 id="group-add-product-title">Add product to this group</h2><p class="muted">Choose one of the options already configured for this group. Its SKU, quantity and category are supplied automatically.</p></div>
+        <span class="settings-readonly">Group product</span>
+      </div>
+      <form class="settings-form" data-group-product-form>
+        <fieldset class="settings-group"><legend>Group product setup</legend>
+          <div class="settings-fields settings-fields-two">
+            <label class="field"><span data-group-option-label>Group option</span><select name="group_option_id" required data-group-option-select><option value="">Choose an available option</option></select><small class="muted" data-group-option-status>Select an option from this group's predefined options.</small></label>
+            <label class="field"><span>Product name</span><input name="name" type="text" required maxlength="160" readonly data-group-product-name><small class="muted">Built automatically from the group name and selected option.</small></label></label>
+            <label class="field"><span>SKU</span><input name="sku" type="text" readonly data-group-product-sku><small class="muted">Taken from the selected group option.</small></label>
+            <label class="field"><span>Quantity</span><input name="stock_quantity" type="number" readonly data-group-product-quantity><small class="muted">Taken from the selected group option.</small></label>
+            <label class="field"><span>Category / subcategory</span><input name="category_name" type="text" readonly data-group-product-category><small class="muted">Taken from the group setup.</small></label>
+            <label class="field"><span>Status</span><select name="status"><option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option></select></label>
+            <label class="field"><span>Price (ZAR)</span><input name="price" type="number" min="0" step="0.01" inputmode="decimal" value="0"></label>
+            <label class="field"><span>Sort order</span><input name="sort_order" type="number" min="0" step="1" inputmode="numeric" value="0"></label>
+            <label class="field"><span><input name="track_stock" type="checkbox" checked> Track stock</span></label>
+            <label class="field field-wide"><span>Description</span><textarea name="description" rows="5" maxlength="5000" placeholder="Describe this product"></textarea></label>
+            <label class="field field-wide"><span>Product pictures</span><input name="images" type="file" accept="image/*" multiple><small class="muted">You can select multiple pictures. Maximum 10 MB per picture.</small></label>
+            <div class="field field-wide"><span>Selected pictures</span><div class="muted" data-image-selection>No pictures selected.</div><small class="muted">Choose which selected picture should be the main product image.</small></div>
+          </div>
+        </fieldset>
+        <fieldset class="settings-group"><legend>Product attributes</legend>
+          <p class="muted">These attributes belong to this individual product. The group only establishes the product relationship.</p>
+          <div class="settings-fields settings-fields-two" data-product-attributes></div>
+          <div class="settings-actions"><button class="button button-outline" type="button" data-add-product-attribute>+ Add attribute</button></div>
+        </fieldset>
+        <div class="settings-actions"><span class="settings-load-status" data-group-form-status aria-live="polite">Choose an available group option.</span><div><button class="button button-outline" type="button" data-cancel-group-product>Cancel</button> <button class="button button-primary" type="submit" data-save-group-product>Save product</button></div></div>
+      </form>
+    </section>
+
+    <section class="settings-panel" aria-labelledby="group-products-title">
+      <div class="settings-heading">
+        <div><h2 id="group-products-title">Products in this group</h2><p class="muted">Products assigned to this group are still normal products and remain visible in the main catalogue.</p></div>
+        <button class="button button-primary" type="button" data-add-product>Add Product</button>
+      </div>
+      <div class="settings-notice" data-products-status role="status">Loading products…</div>
+      <div class="admin-sections" data-products-list></div>
+    </section>
+  </div></main>
+
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">Clothing Store</a><p>© <span data-current-year>2026</span> Clothing Store</p><a href="./">Back to Products</a></div></footer>
+
+  <script type="module">
+    const groupId = new URLSearchParams(location.search).get('id');
+    const title = document.querySelector('[data-group-title]');
+    const meta = document.querySelector('[data-group-meta]');
+    const details = document.querySelector('[data-group-details]');
+    const optionsList = document.querySelector('[data-options-list]');
+    const productsList = document.querySelector('[data-products-list]');
+    const productsStatus = document.querySelector('[data-products-status]');
+    const addProduct = document.querySelector('[data-add-product]');
+    const productFormPanel = document.querySelector('section[data-group-product-form]');
+    const productForm = document.querySelector('form[data-group-product-form]');
+    const optionSelect = document.querySelector('[data-group-option-select]');
+    const optionStatus = document.querySelector('[data-group-option-status]');
+    const productName = document.querySelector('[data-group-product-name]');
+    const productSku = document.querySelector('[data-group-product-sku]');
+    const productQuantity = document.querySelector('[data-group-product-quantity]');
+    const productCategory = document.querySelector('[data-group-product-category]');
+    const imageInput = productForm.elements.images;
+    const imageSelection = document.querySelector('[data-image-selection]');
+    const formStatus = document.querySelector('[data-group-form-status]');
+    const saveProductButton = document.querySelector('[data-save-group-product]');
+    const productAttributesContainer = document.querySelector('[data-product-attributes]');
+    const addProductAttributeButton = document.querySelector('[data-add-product-attribute]');
+    const productAttributeNames = ['Color', 'Size', 'Material', 'Weight', 'Dimensions', 'Capacity'];
+    const productAttributeUnits = {
+      Weight: ['g', 'kg', 'mg', 'lb', 'oz'],
+      Dimensions: ['mm', 'cm', 'm', 'in', 'ft'],
+      Capacity: ['mL', 'L', 'cL', 'dL', 'gal', 'fl oz']
+    };
+    const productAttributeColors = [
+      ['Black', '#000000'], ['White', '#ffffff'], ['Red', '#dc2626'], ['Blue', '#2563eb'],
+      ['Green', '#16a34a'], ['Yellow', '#facc15'], ['Orange', '#f97316'], ['Purple', '#9333ea'],
+      ['Pink', '#ec4899'], ['Brown', '#92400e'], ['Grey', '#6b7280'], ['Beige', '#d6c3a5'],
+      ['Navy', '#1e3a8a'], ['Maroon', '#7f1d1d'], ['Burgundy', '#800020'], ['Cream', '#fff7d6'],
+      ['Khaki', '#c3b091'], ['Olive', '#808000'], ['Teal', '#0f766e'], ['Turquoise', '#14b8a6'],
+      ['Gold', '#d4af37'], ['Silver', '#c0c0c0']
+    ];
+
+    function parseAttributeMeasurement(value, units) {
+      const text = String(value || '').trim();
+      const match = text.match(/^([+-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+))\\s*(.+)$/);
+      if (!match) return { number: text, unit: units[0] };
+      const unit = units.find((item) => item.toLowerCase() === match[2].trim().toLowerCase());
+      return { number: match[1], unit: unit || units[0] };
+    }
+
+    function attributeValueMarkup(name, value) {
+      if (name.toLowerCase() === 'color') {
+        const selectedColor = productAttributeColors.find((item) => item[0].toLowerCase() === String(value || '').trim().toLowerCase());
+        const buttons = productAttributeColors.map(([colorName, hex]) => {
+          const selected = selectedColor?.[0].toLowerCase() === colorName.toLowerCase();
+          return '<button class="product-color-swatch product-attribute-color-swatch' + (selected ? ' is-selected' : '') + '" type="button" data-product-attribute-color="' + escapeHtml(colorName) + '" aria-pressed="' + (selected ? 'true' : 'false') + '" title="' + escapeHtml(colorName) + '"><span class="product-color-swatch-dot" style="background:' + hex + ';"></span><span>' + escapeHtml(colorName) + '</span></button>';
+        }).join('');
+        return '<div class="product-color-palette product-attribute-color-palette" data-product-attribute-color-palette>' + buttons + '</div><input data-product-attribute-value type="hidden" value="' + escapeHtml(selectedColor?.[0] || String(value || '')) + '">';
+      }
+
+      const units = productAttributeUnits[name];
+      if (units) {
+        const parsed = parseAttributeMeasurement(value, units);
+        return '<div class="settings-fields settings-fields-two product-attribute-measurement"><label class="field"><span>Value</span><input data-product-attribute-number type="number" step="any" inputmode="decimal" value="' + escapeHtml(parsed.number) + '" placeholder="Enter number"></label><label class="field"><span>Unit</span><select data-product-attribute-unit>' + units.map((unit) => '<option value="' + escapeHtml(unit) + '"' + (unit.toLowerCase() === parsed.unit.toLowerCase() ? ' selected' : '') + '>' + escapeHtml(unit) + '</option>').join('') + '</select></label></div>';
+      }
+
+      return '<input data-product-attribute-value type="text" maxlength="500" placeholder="Enter ' + escapeHtml(name.toLowerCase()) + '" value="' + escapeHtml(value || '') + '">';
+    }
+
+    function addProductAttributeRow(attribute = {}) {
+      const row = document.createElement('div');
+      row.className = 'settings-fields settings-fields-two product-attribute-row';
+      row.dataset.productAttributeRow = '';
+      const selectedName = String(attribute.name || '');
+      const value = String(attribute.value || '');
+      row.innerHTML = `
+        <label class="field">
+          <span>Attribute</span>
+          <select data-product-attribute-name>
+            <option value="">Select attribute</option>
+            ${productAttributeNames.map((name) => '<option value="' + escapeHtml(name) + '"' + (selectedName.toLowerCase() === name.toLowerCase() ? ' selected' : '') + '>' + escapeHtml(name) + '</option>').join('')}
+            <option value="custom"${selectedName && !productAttributeNames.some((name) => name.toLowerCase() === selectedName.toLowerCase()) ? ' selected' : ''}>Custom attribute</option>
+          </select>
+          <input data-product-attribute-custom type="text" maxlength="80" placeholder="Custom attribute name" value="${selectedName && !productAttributeNames.some((name) => name.toLowerCase() === selectedName.toLowerCase()) ? escapeHtml(selectedName) : ''}" hidden>
+        </label>
+        <label class="field field-wide" data-product-attribute-value-field>
+          <span>Value</span>
+          <div data-product-attribute-editor>${attributeValueMarkup(selectedName, value)}</div>
+        </label>
+        <div class="field">
+          <button class="button button-small button-outline" type="button" data-remove-product-attribute>Remove</button>
+        </div>`;
+      productAttributesContainer.append(row);
+
+      const select = row.querySelector('[data-product-attribute-name]');
+      const customInput = row.querySelector('[data-product-attribute-custom]');
+      const editor = row.querySelector('[data-product-attribute-editor]');
+      const syncCustom = () => { customInput.hidden = select.value !== 'custom'; };
+      const renderValueEditor = (preserveValue = true) => {
+        const oldName = row.dataset.attributeName || '';
+        const oldValue = preserveValue ? readAttributeRowValue(row) : '';
+        row.dataset.attributeName = select.value;
+        editor.innerHTML = attributeValueMarkup(select.value, oldName && oldName.toLowerCase() === select.value.toLowerCase() ? oldValue : '');
+        row.querySelector('[data-product-attribute-value-field] > span').textContent = select.value === 'Color' ? 'Color' : select.value || 'Value';
+      };
+
+      row.dataset.attributeName = selectedName;
+      select.addEventListener('change', () => {
+        syncCustom();
+        renderValueEditor(true);
+      });
+      row.addEventListener('click', (event) => {
+        const colorButton = event.target.closest('[data-product-attribute-color]');
+        if (!colorButton) return;
+        const valueInput = row.querySelector('[data-product-attribute-value]');
+        if (!valueInput) return;
+        valueInput.value = colorButton.dataset.productAttributeColor;
+        row.querySelectorAll('[data-product-attribute-color]').forEach((button) => {
+          const selected = button === colorButton;
+          button.classList.toggle('is-selected', selected);
+          button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        });
+      });
+      syncCustom();
+      return row;
+    }
+
+    function readAttributeRowValue(row) {
+      const name = row.dataset.attributeName || row.querySelector('[data-product-attribute-name]')?.value || '';
+      const colorValue = row.querySelector('[data-product-attribute-value]');
+      if (name.toLowerCase() === 'color' && colorValue) return colorValue.value.trim();
+
+      const numberInput = row.querySelector('[data-product-attribute-number]');
+      const unitSelect = row.querySelector('[data-product-attribute-unit]');
+      if (numberInput && unitSelect) {
+        const number = numberInput.value.trim();
+        const unit = unitSelect.value.trim();
+        return number ? number + ' ' + unit : '';
+      }
+
+      return colorValue?.value.trim() || row.querySelector('[data-product-attribute-custom]')?.value.trim() || '';
+    }
+
+    function readProductAttributes() {
+      return Array.from(productAttributesContainer.querySelectorAll('[data-product-attribute-row]'))
+        .map((row) => {
+          const select = row.querySelector('[data-product-attribute-name]');
+          const custom = row.querySelector('[data-product-attribute-custom]');
+          const name = select.value === 'custom' ? custom.value.trim() : select.value.trim();
+          row.dataset.attributeName = name;
+          return { name, value: readAttributeRowValue(row) };
+        })
+        .filter((attribute) => attribute.name && attribute.value);
+    }
+
+    function resetProductAttributes() {
+      productAttributesContainer.innerHTML = '';
+    }
+
+    addProductAttributeButton.addEventListener('click', () => addProductAttributeRow());
+    productAttributesContainer.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-remove-product-attribute]');
+      if (button) button.closest('[data-product-attribute-row]')?.remove();
+    });
+
+    const cancelProductButton = document.querySelector('[data-cancel-group-product]');
+    let group = null;
+    let groupProducts = [];
+    let mainImageIndex = 0;
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+    }
+
+    async function getToken() {
+      if (typeof window.getAdminIdToken !== 'function') throw new Error('Admin authentication is still loading.');
+      const token = await window.getAdminIdToken();
+      if (!token) throw new Error('Authentication required. Please sign in again.');
+      return token;
+    }
+
+    async function apiFetch(url, options = {}) {
+      const token = await getToken();
+      const headers = new Headers(options.headers || {});
+      headers.set('Authorization', 'Bearer ' + token);
+      if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+      const response = await fetch(url, { ...options, headers });
+      const text = await response.text();
+      let payload = {};
+      try { payload = text ? JSON.parse(text) : {}; } catch {}
+      if (!response.ok || !payload.success) throw new Error(payload.error || 'Request failed: ' + response.status);
+      return payload;
+    }
+
+    function getCategoryLabel() {
+      if (!group) return 'No category';
+      return group.category_name || 'No category';
+    }
+
+    function renderGroup() {
+      const type = group.relationship_type === 'size' ? 'Size' : 'Color';
+      title.textContent = group.name;
+      meta.textContent = type + (group.category_name ? ' · ' + group.category_name : '') + ' · ' + (group.options?.length || 0) + ' option(s)';
+
+      details.innerHTML =
+        '<div class="field"><span>Group name</span><strong>' + escapeHtml(group.name) + '</strong></div>' +
+        '<div class="field"><span>Grouping type</span><strong>' + escapeHtml(type) + '</strong></div>' +
+        '<div class="field"><span>Category</span><strong>' + escapeHtml(group.category_name || 'No category') + '</strong></div>' +
+        '<div class="field"><span>Slug</span><strong>' + escapeHtml(group.slug || '') + '</strong></div>';
+
+      optionsList.innerHTML = '';
+      for (const option of (group.options || [])) {
+        const panel = document.createElement('div');
+        panel.className = 'admin-panel';
+        panel.innerHTML =
+          '<div><h3>' + escapeHtml(option.value) + '</h3><p class="muted">SKU ' + escapeHtml(option.sku || '—') + ' · Quantity ' + Number(option.quantity || 0) + '</p></div>' +
+          '<div><span class="settings-readonly">Option</span></div>';
+        optionsList.append(panel);
+      }
+      if (!group.options?.length) optionsList.innerHTML = '<p class="muted">No options have been added to this group.</p>';
+    }
+
+    function updateGroupOptionLabel() {
+      const label = document.querySelector('[data-group-option-label]');
+      if (label) label.textContent = group?.relationship_type === 'size' ? 'Size' : 'Color';
+    }
+
+    function renderOptionChoices() {
+      updateGroupOptionLabel();
+      optionSelect.innerHTML = '<option value="">Choose an available option</option>';
+      const assignedOptionIds = new Set(groupProducts.map((product) => String(product.product_group_option_id)).filter(Boolean));
+      const available = (group?.options || []).filter((option) => !assignedOptionIds.has(String(option.id)));
+
+      for (const option of available) {
+        const item = document.createElement('option');
+        item.value = option.id;
+        item.textContent = option.value + (option.sku ? ' · ' + option.sku : '') + ' · Qty ' + Number(option.quantity || 0);
+        item.dataset.sku = option.sku || '';
+        item.dataset.quantity = String(option.quantity ?? 0);
+        item.dataset.value = option.value || '';
+        optionSelect.append(item);
+      }
+
+      optionSelect.disabled = !available.length;
+      optionStatus.textContent = available.length
+        ? 'Choose an option that does not already have a product.'
+        : 'All group options already have products.';
+      if (!available.length) productFormPanel.hidden = true;
+    }
+
+    function updateSelectedOption() {
+      const option = optionSelect.selectedOptions[0];
+      if (!option?.value) {
+        productSku.value = '';
+        productQuantity.value = '';
+        productName.value = group?.name || '';
+        formStatus.textContent = 'Choose the product option/colour first.';
+        return;
+      }
+      const optionValue = option.dataset.value || '';
+      productSku.value = option.dataset.sku || '';
+      productQuantity.value = option.dataset.quantity || '0';
+      productName.value = group?.name ? group.name + ' — ' + optionValue : optionValue;
+      formStatus.textContent = 'Ready to create the ' + optionValue + ' product.';
+    }
+
+    function resetProductForm() {
+      productForm.reset();
+      productName.value = group?.name || '';
+      productCategory.value = getCategoryLabel();
+      productSku.value = '';
+      productQuantity.value = '';
+      productForm.elements.price.value = '0';
+      productForm.elements.status.value = 'draft';
+      productForm.elements.description.value = '';
+      productForm.elements.sort_order.value = '0';
+      productForm.elements.track_stock.checked = true;
+      imageSelection.textContent = 'No pictures selected.';
+      mainImageIndex = 0;
+      formStatus.textContent = 'Choose an available group option.';
+      updateSelectedOption();
+    }
+
+    function updateImageSelectionText() {
+      const files = Array.from(imageInput.files || []);
+      if (!files.length) {
+        imageSelection.innerHTML = 'No pictures selected.';
+        mainImageIndex = 0;
+        return;
+      }
+
+      if (mainImageIndex >= files.length) mainImageIndex = 0;
+      imageSelection.innerHTML = '';
+      const list = document.createElement('div');
+      list.className = 'settings-fields';
+      files.forEach((file, index) => {
+        const row = document.createElement('label');
+        row.className = 'field';
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'main_image';
+        radio.value = String(index);
+        radio.checked = index === mainImageIndex;
+        radio.addEventListener('change', () => {
+          mainImageIndex = index;
+        });
+        const text = document.createElement('span');
+        text.textContent = (index === mainImageIndex ? 'Main image: ' : 'Use as image: ') + file.name;
+        row.append(radio, document.createTextNode(' '), text);
+        list.append(row);
+      });
+      imageSelection.append(list);
+    }
+
+    async function uploadImage(file) {
+      const data = new FormData();
+      data.append('file', file, file.name);
+      const payload = await apiFetch('/api/upload-image', { method: 'POST', body: data });
+      return payload.data;
+    }
+
+    async function saveProductImages(productId, files) {
+      if (!files.length) return;
+      const images = [];
+      for (let index = 0; index < files.length; index += 1) {
+        formStatus.textContent = 'Uploading picture ' + (index + 1) + ' of ' + files.length + '…';
+        const uploaded = await uploadImage(files[index]);
+        images.push({
+          image_url: uploaded.image_url,
+          cloudinary_public_id: uploaded.cloudinary_public_id,
+          alt_text: productName.value.trim(),
+          sort_order: index,
+          is_primary: index === mainImageIndex
+        });
+      }
+      await apiFetch('/api/products?id=' + encodeURIComponent(productId), {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: productName.value.trim(),
+          sku: productSku.value.trim(),
+          product_group_id: group.id,
+          product_group_option_id: optionSelect.value,
+          category_id: group.category_id || null,
+          status: productForm.elements.status.value,
+          price: Number(productForm.elements.price.value || 0),
+          stock_quantity: Number(productQuantity.value || 0),
+          sort_order: Number(productForm.elements.sort_order.value || 0),
+          track_stock: productForm.elements.track_stock.checked,
+          description: productForm.elements.description.value.trim(),
+          images
+        })
+      });
+    }
+
+    function showProductForm() {
+      productFormPanel.hidden = false;
+      window.scrollTo({ top: productFormPanel.getBoundingClientRect().top + window.scrollY - 24, behavior: 'smooth' });
+      optionSelect.focus();
+    }
+
+    function hideProductForm() {
+      productFormPanel.hidden = true;
+      resetProductForm();
+    }
+
+    function renderProducts(products) {
+      productsList.innerHTML = '';
+      if (!products.length) {
+        productsList.innerHTML = '<p class="muted">No products are assigned to this group yet.</p>';
+        return;
+      }
+      for (const product of products) {
+        const panel = document.createElement('div');
+        panel.className = 'admin-panel';
+        const option = product.product_group_option_value || product.product_group_value || 'No option';
+        const status = product.status || 'draft';
+        panel.innerHTML =
+          '<div><h3><a href="./product.html?id=' + encodeURIComponent(product.id) + '&group_id=' + encodeURIComponent(groupId) + '">' + escapeHtml(product.name) + '</a></h3>' +
+          '<p class="muted">SKU ' + escapeHtml(product.sku || '—') + ' · ' + escapeHtml(option) + ' · ' + escapeHtml(status) + '</p>' +
+          '<p class="muted">' + escapeHtml(product.currency || 'ZAR') + ' ' + Number(product.price || 0).toFixed(2) + ' · Stock ' + Number(product.stock_quantity || 0) + '</p></div>' +
+          '<div><a class="button button-small button-outline" href="./product.html?id=' + encodeURIComponent(product.id) + '&group_id=' + encodeURIComponent(groupId) + '">Manage Product</a></div>';
+        productsList.append(panel);
+      }
+    }
+
+    async function load() {
+      if (!groupId) {
+        title.textContent = 'Product Group';
+        meta.textContent = 'No group was selected.';
+        details.innerHTML = '<p class="muted">Open a product group from the Products page.</p>';
+        optionsList.innerHTML = '';
+        productsStatus.textContent = 'No group selected.';
+        addProduct.hidden = true;
+        return;
+      }
+
+      try {
+        const groupPayload = await apiFetch('/api/product-groups');
+        const groups = Array.isArray(groupPayload.data) ? groupPayload.data : [];
+        group = groups.find((item) => String(item.id) === String(groupId));
+        if (!group) throw new Error('Product group not found.');
+        renderGroup();
+
+        const results = await Promise.all(['draft', 'active', 'archived'].map((status) =>
+          apiFetch('/api/products?status=' + encodeURIComponent(status) + '&product_group_id=' + encodeURIComponent(groupId) + '&limit=100')
+        ));
+        groupProducts = results.flatMap((result) => result.data?.products || [])
+          .sort((a, b) => Number(a.sort_order) - Number(b.sort_order) || Number(b.id) - Number(a.id));
+        renderProducts(groupProducts);
+        renderOptionChoices();
+        productCategory.value = getCategoryLabel();
+        productsStatus.textContent = groupProducts.length + ' product(s) in this group.';
+      } catch (error) {
+        meta.textContent = 'Unable to load this product group.';
+        details.innerHTML = '<p class="muted">' + escapeHtml(error.message) + '</p>';
+        optionsList.innerHTML = '';
+        productsList.innerHTML = '';
+        productsStatus.textContent = error.message;
+        addProduct.hidden = true;
+      }
+    }
+
+    addProduct.addEventListener('click', () => {
+      resetProductForm();
+      showProductForm();
+    });
+
+    cancelProductButton.addEventListener('click', hideProductForm);
+    optionSelect.addEventListener('change', updateSelectedOption);
+    imageInput.addEventListener('change', () => {
+      mainImageIndex = 0;
+      updateImageSelectionText();
+    });
+
+    productForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const option = optionSelect.selectedOptions[0];
+      if (!option?.value) {
+        formStatus.textContent = 'Choose an available group option first.';
+        return;
+      }
+      const files = Array.from(imageInput.files || []);
+      const data = {
+        name: productName.value.trim(),
+        sku: productSku.value.trim(),
+        product_group_id: group.id,
+        product_group_option_id: optionSelect.value,
+        category_id: group.category_id || null,
+        status: productForm.elements.status.value,
+        price: Number(productForm.elements.price.value || 0),
+        stock_quantity: Number(productQuantity.value || 0),
+        sort_order: Number(productForm.elements.sort_order.value || 0),
+        track_stock: productForm.elements.track_stock.checked,
+        description: productForm.elements.description.value.trim(),
+        attributes: readProductAttributes()
+      };
+      if (!data.name) {
+        formStatus.textContent = 'Product name is required.';
+        return;
+      }
+      if (!confirm('Create this product for the ' + (option.dataset.value || 'selected') + ' option?')) return;
+
+      saveProductButton.disabled = true;
+      setTimeout(() => {}, 0);
+      formStatus.textContent = 'Creating product…';
+      try {
+        const saved = await apiFetch('/api/products', { method: 'POST', body: JSON.stringify(data) });
+        if (files.length) await saveProductImages(saved.data.id, files);
+        await load();
+        hideProductForm();
+        formStatus.textContent = 'Product created.';
+      } catch (error) {
+        formStatus.textContent = error.message;
+      } finally {
+        saveProductButton.disabled = false;
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

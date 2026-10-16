@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edit Information Page | Clothing Store Admin</title>
+<link rel="stylesheet" href="../../../assets/css/styles.css">
+<script type="module" src="../../../assets/js/firebase-auth.js"></script>
+<script src="../../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+<header class="admin-header"><div class="container header-inner"><a class="brand" href="../../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+<main class="admin-main"><div class="container">
+<div class="settings-heading">
+  <div><p class="eyebrow">Store content</p><h1 data-title>Edit Information Page</h1><p class="muted">Update this page, publish it, or remove it from the store.</p></div>
+  <div><a class="button button-outline" href="../">Back to Information Pages</a></div>
+</div>
+<section class="settings-panel">
+<form class="settings-form" data-form>
+<div class="settings-fields settings-fields-two">
+<label class="field"><span>Page title</span><input name="title" required maxlength="160"></label>
+<label class="field"><span>Page slug</span><input name="slug" readonly></label>
+<label class="field"><span>Sort order</span><input name="sort_order" type="number" min="0" step="1"></label>
+<label class="field"><span><input name="is_published" type="checkbox"> Published</span></label>
+<label class="field" style="grid-column:1/-1"><span>Page content</span><textarea name="content" rows="18" style="width:100%;resize:vertical"></textarea></label>
+</div>
+<div class="settings-actions"><span class="settings-load-status" data-status>Loading…</span><div><button class="button button-outline" type="button" data-delete>Delete page</button> <button class="button button-primary" type="submit" data-save>Save changes</button></div></div>
+</form>
+</section>
+</div></main>
+<script src="../../../assets/js/content-edit.js" defer></script>
+</body>
+</html>

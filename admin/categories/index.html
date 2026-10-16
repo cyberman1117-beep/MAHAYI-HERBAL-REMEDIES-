@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Manage main categories and product categories for the Clothing Store.">
+  <title>Categories | Clothing Store Admin</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <script type="module" src="../../assets/js/firebase-auth.js"></script>
+  <script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#categories-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+
+  <main id="categories-main" class="admin-main"><div class="container">
+    <div class="settings-heading">
+      <div><p class="eyebrow">Catalogue management</p><h1>Categories</h1><p class="muted">Manage the store's main categories and regular categories from one place.</p></div>
+      <div><a class="button button-outline" href="../">Back to dashboard</a> <a class="button button-primary" href="./create.html">+ Create Category</a></div>
+    </div>
+
+
+    <section class="settings-panel" aria-labelledby="merchandising-title">
+      <div class="settings-heading"><div><p class="eyebrow">Independent merchandising</p><h2 id="merchandising-title">Merchandising</h2><p class="muted">New Arrivals and Promotions are independent merchandising controls. They do not create or change categories.</p></div></div>
+      <div class="admin-sections">
+        <section class="admin-panel"><div class="panel-icon">NA</div><div><h2>New Arrivals</h2><p class="muted">Choose products to feature as new arrivals and set how long each one stays marked as new.</p></div><a class="button button-outline" href="./new-arrivals.html">Manage new arrivals</a></section>
+        <section class="admin-panel"><div class="panel-icon">PR</div><div><h2>Promotions</h2><p class="muted">Enable promotional pricing independently from categories and catalogue product details.</p></div><a class="button button-outline" href="./promotions.html">Manage promotions</a></section>
+      </div>
+    </section>
+
+    <section class="settings-panel" aria-labelledby="main-categories-title">
+      <div class="settings-heading"><div><h2 id="main-categories-title">Main Categories</h2><p class="muted">These are the major sections of the store. Regular categories can be linked to them.</p></div><button class="button button-outline" type="button" data-refresh-categories>Refresh</button></div>
+      <div class="settings-notice" data-main-list-status role="status">Loading main categories…</div>
+      <div class="admin-sections" data-main-categories-list></div>
+    </section>
+
+    <section class="settings-panel" aria-labelledby="categories-list-title">
+      <div class="settings-heading"><div><h2 id="categories-list-title">Categories</h2><p class="muted">Regular categories and the main category they are linked to.</p></div></div>
+      <div class="settings-notice" data-list-status role="status">Loading categories…</div>
+      <div class="admin-sections" data-categories-list></div>
+    </section>
+  </div></main>
+
+  </div></main>
+
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">Clothing Store</a><p>© <span data-current-year>2026</span> Clothing Store</p><a href="../">Back to dashboard</a></div></footer>
+
+  <script type="module">
+    const mainListStatus = document.querySelector('[data-main-list-status]');
+    const listStatus = document.querySelector('[data-list-status]');
+    const mainList = document.querySelector('[data-main-categories-list]');
+    const list = document.querySelector('[data-categories-list]');
+    let categories = [];
+
+    async function getToken() {
+      if (typeof window.getAdminIdToken !== 'function') throw new Error('Admin authentication is still loading.');
+      const token = await window.getAdminIdToken();
+      if (!token) throw new Error('Authentication required. Please sign in again.');
+      return token;
+    }
+
+    async function apiFetch(url, options = {}) {
+      const token = await getToken();
+      const headers = new Headers(options.headers || {});
+      headers.set('Authorization', `Bearer ${token}`);
+      if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+      const response = await fetch(url, { ...options, headers });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) throw new Error(payload.error || 'Request failed.');
+      return payload;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'\"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '\"': '&quot;' }[character]));
+    }
+
+    async function loadCategories() {
+      mainListStatus.textContent = 'Loading main categories…';
+      listStatus.textContent = 'Loading categories…';
+      try {
+        const payload = await apiFetch('/api/categories?include_disabled=1');
+        categories = (payload.data || []).slice().sort((a, b) => Number(a.sort_order) - Number(b.sort_order) || Number(a.id) - Number(b.id));
+        renderCategories();
+        const mainCount = categories.filter((item) => Number(item.is_main_category) === 1).length;
+        const regularCount = categories.filter((item) => Number(item.is_main_category) !== 1).length;
+        mainListStatus.textContent = mainCount ? `${mainCount} main categor${mainCount === 1 ? 'y' : 'ies'} configured.` : 'No main categories yet. Use Create Category to create one.';
+        listStatus.textContent = regularCount ? `${regularCount} regular categor${regularCount === 1 ? 'y' : 'ies'} loaded.` : 'No regular categories yet.';
+      } catch (error) {
+        mainListStatus.textContent = error.message;
+        listStatus.textContent = error.message;
+      }
+    }
+
+    function mainCategoryName(category) {
+      const main = categories.find((item) => Number(item.id) === Number(category.parent_id) && Number(item.is_main_category) === 1);
+      return main?.name || 'No main category';
+    }
+
+    function renderPanel(category, relationshipText) {
+      const panel = document.createElement('section');
+      panel.className = 'admin-panel';
+      const enabledLabel = Number(category.is_enabled) === 1 ? 'Enabled' : 'Disabled';
+      const flags = [
+        Number(category.show_in_navigation) === 1 ? 'Nav' : null,
+        Number(category.show_on_homepage) === 1 ? 'Homepage' : null,
+        Number(category.is_featured) === 1 ? 'Featured' : null,
+        Number(category.is_promoted) === 1 ? 'Promoted' : null
+      ].filter(Boolean);
+      panel.innerHTML = `
+        <div class="panel-icon">${escapeHtml(String(category.sort_order).padStart(2, '0'))}</div>
+        <div>
+          <h2>${escapeHtml(category.name)}</h2>
+          <p class="muted">${escapeHtml(relationshipText)} · /${escapeHtml(category.slug)} · ${enabledLabel}</p>
+          ${flags.length ? `<p class="muted">${escapeHtml(flags.join(' · '))}</p>` : ''}
+          ${category.showcase_image_url ? '<p class="muted">Showcase image configured</p>' : ''}
+          ${category.description ? `<p class="muted">${escapeHtml(category.description)}</p>` : ''}
+        </div>
+        <div>
+          <button class="button button-outline" type="button" data-edit="${category.id}">Edit</button>
+          <button class="button button-outline" type="button" data-toggle="${category.id}">${enabledLabel === 'Enabled' ? 'Disable' : 'Enable'}</button>
+          <button class="button button-outline" type="button" data-delete="${category.id}">Delete</button>
+        </div>`;
+      return panel;
+    }
+
+    function renderCategories() {
+      mainList.innerHTML = '';
+      list.innerHTML = '';
+      const mainCategories = categories.filter((item) => Number(item.is_main_category) === 1);
+      const regularCategories = categories.filter((item) => Number(item.is_main_category) !== 1);
+      for (const category of mainCategories) mainList.append(renderPanel(category, 'Main category'));
+      for (const category of regularCategories) list.append(renderPanel(category, `Main category: ${mainCategoryName(category)}`));
+    }
+
+    async function handleListAction(event) {
+      const editId = event.target.closest('[data-edit]')?.dataset.edit;
+      const toggleId = event.target.closest('[data-toggle]')?.dataset.toggle;
+      const deleteId = event.target.closest('[data-delete]')?.dataset.delete;
+
+      if (editId) {
+        window.location.href = `./create.html?id=${encodeURIComponent(editId)}`;
+        return;
+      }
+
+      if (toggleId) {
+        const category = categories.find((item) => String(item.id) === String(toggleId));
+        if (!category) return;
+        const enabled = Number(category.is_enabled) === 1;
+        if (!confirm(`${enabled ? 'Disable' : 'Enable'} “${category.name}”?`)) return;
+        try {
+          await apiFetch(`/api/categories?id=${encodeURIComponent(toggleId)}`, { method: 'PUT', body: JSON.stringify({ is_enabled: !enabled }) });
+          await loadCategories();
+        } catch (error) {
+          listStatus.textContent = error.message;
+        }
+        return;
+      }
+
+      if (deleteId) {
+        const category = categories.find((item) => String(item.id) === String(deleteId));
+        if (!category || !confirm(`Delete “${category.name}”? Products assigned to it will become uncategorized.`)) return;
+        try {
+          await apiFetch(`/api/categories?id=${encodeURIComponent(deleteId)}`, { method: 'DELETE' });
+          await loadCategories();
+        } catch (error) {
+          listStatus.textContent = error.message;
+        }
+      }
+    }
+
+    document.querySelector('[data-refresh-categories]').addEventListener('click', loadCategories);
+    mainList.addEventListener('click', handleListAction);
+    list.addEventListener('click', handleListAction);
+    loadCategories();
+  </script>
+</body>
+</html>

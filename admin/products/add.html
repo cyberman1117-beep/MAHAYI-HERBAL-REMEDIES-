@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Add a product to the Clothing Store catalogue.">
+  <title>Add Product | Clothing Store Admin</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <script type="module" src="../../assets/js/firebase-auth.js"></script>
+  <script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#products-add-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+
+  <main id="products-add-main" class="admin-main"><div class="container">
+    <div class="settings-heading">
+      <div><p class="eyebrow">Catalogue management</p><h1>Add Product</h1><p class="muted">Create a new individual product.</p></div>
+      <div><a class="button button-outline" href="./">Back to Products</a></div>
+    </div>
+
+    <section class="settings-panel">
+      <form class="settings-form" data-product-form>
+        <fieldset class="settings-group"><legend>Product details</legend>
+          <div class="settings-fields settings-fields-two">
+            <label class="field"><span>Product name</span><input name="name" type="text" required maxlength="160" placeholder="Product name"></label>
+            <label class="field"><span>SKU</span><input name="sku" type="text" maxlength="80" placeholder="Auto-generated SKU"><small class="muted">Generated from the product name. You can edit it if needed.</small></label>
+            <label class="field field-wide"><span>Category / subcategory</span><select name="category_id"><option value="">Uncategorized</option></select></label>
+            <label class="field"><span>Status</span><select name="status"><option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option></select></label>
+            <label class="field"><span>Price (ZAR)</span><input name="price" type="number" min="0" step="0.01" inputmode="decimal" value="0"></label>
+            <label class="field"><span>Stock quantity</span><input name="stock_quantity" type="number" min="0" step="1" inputmode="numeric" value="0"></label>
+            <label class="field"><span>Sort order</span><input name="sort_order" type="number" min="0" step="1" inputmode="numeric" value="0"></label>
+            <label class="field"><span><input name="track_stock" type="checkbox" checked> Track stock</span></label>
+            <label class="field field-wide"><span>Description</span><textarea name="description" rows="5" maxlength="5000" placeholder="Describe the product"></textarea></label>
+            <label class="field field-wide"><span>Product pictures</span><input name="images" type="file" accept="image/*" multiple><small class="muted">You can select multiple pictures. Maximum 10 MB per picture.</small></label>
+            <div class="field field-wide"><span>Selected pictures</span><p class="muted" data-image-selection>No pictures selected.</p></div>
+          </div>
+        </fieldset>
+
+        <fieldset class="settings-group"><legend>Product attributes</legend>
+          <p class="muted">Attributes belong to this individual product.</p>
+          <div class="settings-fields settings-fields-two" data-product-attributes></div>
+          <div class="settings-actions"><button class="button button-outline" type="button" data-add-product-attribute>+ Add attribute</button></div>
+        </fieldset>
+
+        <div class="settings-actions"><span class="settings-load-status" data-form-status aria-live="polite">Ready to add a product.</span><div><a class="button button-outline" href="./">Cancel</a> <button class="button button-primary" type="submit" data-save-product>Save product</button></div></div>
+      </form>
+    </section>
+  </div></main>
+
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">Clothing Store</a><p>© <span data-current-year>2026</span> Clothing Store</p><a href="./">Back to Products</a></div></footer>
+
+  <script type="module">
+    import { createProductShippingController } from "../../assets/js/product-shipping-form.js";
+    const form = document.querySelector('[data-product-form]');
+    const categorySelect = form.elements.category_id;
+    const imageInput = form.elements.images;
+    const imageSelection = document.querySelector('[data-image-selection]');
+    const formStatus = document.querySelector('[data-form-status]');
+    const saveButton = document.querySelector('[data-save-product]');
+    const shippingController = createProductShippingController({ form, apiFetch });
+    const productAttributesContainer = document.querySelector('[data-product-attributes]');
+    const addProductAttributeButton = document.querySelector('[data-add-product-attribute]');
+    const productAttributeNames = ['Color', 'Size', 'Material', 'Weight', 'Dimensions', 'Capacity'];
+    const productAttributeUnits = { Weight: ['g', 'kg', 'mg', 'lb', 'oz'], Dimensions: ['mm', 'cm', 'm', 'in', 'ft'], Capacity: ['mL', 'L', 'cL', 'dL', 'gal', 'fl oz'] };
+    const productAttributeColors = [
+      ['Black', '#000000'], ['White', '#ffffff'], ['Red', '#dc2626'], ['Blue', '#2563eb'],
+      ['Green', '#16a34a'], ['Yellow', '#facc15'], ['Orange', '#f97316'], ['Purple', '#9333ea'],
+      ['Pink', '#ec4899'], ['Brown', '#92400e'], ['Grey', '#6b7280'], ['Beige', '#d6c3a5'],
+      ['Navy', '#1e3a8a'], ['Maroon', '#7f1d1d'], ['Burgundy', '#800020'], ['Cream', '#fff7d6'],
+      ['Khaki', '#c3b091'], ['Olive', '#808000'], ['Teal', '#0f766e'], ['Turquoise', '#14b8a6'],
+      ['Gold', '#d4af37'], ['Silver', '#c0c0c0']
+    ];
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+    }
+    function parseAttributeMeasurement(value, units) {
+      const text = String(value || '').trim();
+      const match = text.match(/^([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*(.+)$/);
+      if (!match) return { number: text, unit: units[0] };
+      const unit = units.find((item) => item.toLowerCase() === match[2].trim().toLowerCase());
+      return { number: match[1], unit: unit || units[0] };
+    }
+    function attributeValueMarkup(name, value) {
+      if (name.toLowerCase() === 'color') {
+        const selectedColor = productAttributeColors.find((item) => item[0].toLowerCase() === String(value || '').trim().toLowerCase());
+        const buttons = productAttributeColors.map(([colorName, hex]) => {
+          const selected = selectedColor?.[0].toLowerCase() === colorName.toLowerCase();
+          return '<button class="product-color-swatch product-attribute-color-swatch' + (selected ? ' is-selected' : '') + '" type="button" data-product-attribute-color="' + escapeHtml(colorName) + '" aria-pressed="' + (selected ? 'true' : 'false') + '" title="' + escapeHtml(colorName) + '"><span class="product-color-swatch-dot" style="background:' + hex + ';"></span><span>' + escapeHtml(colorName) + '</span></button>';
+        }).join('');
+        return '<div class="product-color-palette product-attribute-color-palette">' + buttons + '</div><input data-product-attribute-value type="hidden" value="' + escapeHtml(selectedColor?.[0] || String(value || '')) + '">';
+      }
+      const units = productAttributeUnits[name];
+      if (units) {
+        const parsed = parseAttributeMeasurement(value, units);
+        return '<div class="settings-fields settings-fields-two product-attribute-measurement"><label class="field"><span>Value</span><input data-product-attribute-number type="number" step="any" inputmode="decimal" value="' + escapeHtml(parsed.number) + '" placeholder="Enter number"></label><label class="field"><span>Unit</span><select data-product-attribute-unit>' + units.map((unit) => '<option value="' + escapeHtml(unit) + '"' + (unit.toLowerCase() === parsed.unit.toLowerCase() ? ' selected' : '') + '>' + escapeHtml(unit) + '</option>').join('') + '</select></label></div>';
+      }
+      return '<input data-product-attribute-value type="text" maxlength="500" placeholder="Enter ' + escapeHtml(name.toLowerCase()) + '" value="' + escapeHtml(value || '') + '">';
+    }
+    function readAttributeRowValue(row) {
+      const name = row.dataset.attributeName || row.querySelector('[data-product-attribute-name]')?.value || '';
+      const valueInput = row.querySelector('[data-product-attribute-value]');
+      if (name.toLowerCase() === 'color' && valueInput) return valueInput.value.trim();
+      const numberInput = row.querySelector('[data-product-attribute-number]');
+      const unitSelect = row.querySelector('[data-product-attribute-unit]');
+      if (numberInput && unitSelect) return numberInput.value.trim() ? numberInput.value.trim() + ' ' + unitSelect.value.trim() : '';
+      return valueInput?.value.trim() || '';
+    }
+    function addProductAttributeRow() {
+      const row = document.createElement('div');
+      row.className = 'settings-fields settings-fields-two product-attribute-row';
+      row.dataset.productAttributeRow = '';
+      row.innerHTML = '<label class="field"><span>Attribute</span><select data-product-attribute-name><option value="">Select attribute</option>' +
+        productAttributeNames.map((name) => '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>').join('') +
+        '<option value="custom">Custom attribute</option></select><input data-product-attribute-custom type="text" maxlength="80" placeholder="Custom attribute name" hidden></label>' +
+        '<label class="field field-wide"><span>Value</span><div data-product-attribute-editor>' + attributeValueMarkup('', '') + '</div></label>' +
+        '<div class="field"><button class="button button-small button-outline" type="button" data-remove-product-attribute>Remove</button></div>';
+      productAttributesContainer.append(row);
+      const select = row.querySelector('[data-product-attribute-name]');
+      const customInput = row.querySelector('[data-product-attribute-custom]');
+      const editor = row.querySelector('[data-product-attribute-editor]');
+      const render = () => {
+        const oldValue = readAttributeRowValue(row);
+        row.dataset.attributeName = select.value;
+        editor.innerHTML = attributeValueMarkup(select.value, oldValue);
+        customInput.hidden = select.value !== 'custom';
+        row.querySelector('[data-product-attribute-value-field]')?.setAttribute('aria-label', select.value || 'Value');
+      };
+      select.addEventListener('change', render);
+      row.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-product-attribute-color]');
+        if (!button) return;
+        const input = row.querySelector('[data-product-attribute-value]');
+        if (!input) return;
+        input.value = button.dataset.productAttributeColor;
+        row.querySelectorAll('[data-product-attribute-color]').forEach((item) => {
+          item.classList.toggle('is-selected', item === button);
+          item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
+        });
+      });
+    }
+    function readProductAttributes() {
+      return Array.from(productAttributesContainer.querySelectorAll('[data-product-attribute-row]')).map((row) => {
+        const select = row.querySelector('[data-product-attribute-name]');
+        const custom = row.querySelector('[data-product-attribute-custom]');
+        const name = select.value === 'custom' ? custom.value.trim() : select.value.trim();
+        row.dataset.attributeName = name;
+        return { name, value: readAttributeRowValue(row) };
+      }).filter((attribute) => attribute.name && attribute.value);
+    }
+
+    async function getToken() {
+      if (typeof window.getAdminIdToken !== 'function') throw new Error('Admin authentication is still loading.');
+      const token = await window.getAdminIdToken();
+      if (!token) throw new Error('Authentication required. Please sign in again.');
+      return token;
+    }
+    async function apiFetch(url, options = {}) {
+      const token = await getToken();
+      const headers = new Headers(options.headers || {});
+      headers.set('Authorization', 'Bearer ' + token);
+      if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+      const response = await fetch(url, { ...options, headers });
+      const responseText = await response.text();
+      let payload = {};
+      try { payload = responseText ? JSON.parse(responseText) : {}; } catch {}
+      if (!response.ok || !payload.success) throw new Error(payload.error || 'Request failed: ' + response.status);
+      return payload;
+    }
+    async function loadCategories() {
+      const response = await fetch('/api/categories', { headers: { Accept: 'application/json' }, cache: 'no-store' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) throw new Error(payload.error || 'Unable to load categories.');
+      const categories = Array.isArray(payload.data) ? payload.data : [];
+      categorySelect.innerHTML = '<option value="">Uncategorized</option>';
+      const enabled = categories.filter((item) => Number(item.is_enabled) === 1).sort((a, b) => Number(a.sort_order) - Number(b.sort_order) || Number(a.id) - Number(b.id));
+      const mainCategories = enabled.filter((item) => Number(item.is_main_category) === 1);
+      const regularCategories = enabled.filter((item) => Number(item.is_main_category) !== 1);
+      const childrenByMain = new Map(mainCategories.map((main) => [Number(main.id), []]));
+      for (const category of regularCategories) {
+        const parent = Number(category.parent_id);
+        if (parent && childrenByMain.has(parent)) childrenByMain.get(parent).push(category);
+      }
+      for (const main of mainCategories) {
+        const group = document.createElement('optgroup');
+        group.label = main.name;
+        const mainOption = document.createElement('option');
+        mainOption.value = main.id; mainOption.textContent = main.name; group.append(mainOption);
+        for (const child of childrenByMain.get(Number(main.id)) || []) {
+          const option = document.createElement('option');
+          option.value = child.id; option.textContent = '↳ ' + child.name; group.append(option);
+        }
+        categorySelect.append(group);
+      }
+      for (const category of regularCategories.filter((item) => !Number(item.parent_id) || !childrenByMain.has(Number(item.parent_id)))) {
+        const option = document.createElement('option');
+        option.value = category.id; option.textContent = category.name; categorySelect.append(option);
+      }
+    }
+    function skuToken(value) {
+      const words = String(value || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+      if (!words.length) return 'PROD';
+      if (words.length === 1) return words[0].slice(0, 6);
+      return words.map((word) => word[0]).join('').slice(0, 6);
+    }
+    form.elements.sku.dataset.autoGenerated = 'true';
+    form.elements.name.addEventListener('input', () => {
+      if (form.elements.sku.dataset.autoGenerated !== 'false') {
+        form.elements.sku.value = skuToken(form.elements.name.value) + '-001';
+        form.elements.sku.dataset.autoGenerated = 'true';
+      }
+    });
+    form.elements.sku.addEventListener('input', () => { form.elements.sku.dataset.autoGenerated = 'false'; });
+
+    let mainImageIndex = 0;
+    function updateImageSelectionText() {
+      const files = Array.from(imageInput.files || []);
+      if (!files.length) { imageSelection.textContent = 'No pictures selected.'; mainImageIndex = 0; return; }
+      if (mainImageIndex >= files.length) mainImageIndex = 0;
+      imageSelection.textContent = files.length + ' picture' + (files.length === 1 ? '' : 's') + ' selected. Main image: ' + files[mainImageIndex].name;
+    }
+    imageInput.addEventListener('change', () => { mainImageIndex = 0; updateImageSelectionText(); });
+
+    async function uploadImage(file) {
+      const data = new FormData();
+      data.append('file', file, file.name);
+      const payload = await apiFetch('/api/upload-image', { method: 'POST', body: data });
+      return payload.data;
+    }
+    async function saveProductImages(productId, files) {
+      if (!files.length) return;
+      const images = [];
+      for (let index = 0; index < files.length; index += 1) {
+        formStatus.textContent = 'Uploading picture ' + (index + 1) + ' of ' + files.length + '…';
+        const uploaded = await uploadImage(files[index]);
+        images.push({ image_url: uploaded.image_url, cloudinary_public_id: uploaded.cloudinary_public_id, alt_text: form.elements.name.value.trim(), sort_order: index, is_primary: index === mainImageIndex });
+      }
+      await apiFetch('/api/products?id=' + encodeURIComponent(productId), { method: 'PUT', body: JSON.stringify({
+        name: form.elements.name.value.trim(), sku: form.elements.sku.value.trim(), category_id: form.elements.category_id.value || null,
+        status: form.elements.status.value, price: Number(form.elements.price.value || 0), stock_quantity: Number(form.elements.stock_quantity.value || 0),
+        sort_order: Number(form.elements.sort_order.value || 0), track_stock: form.elements.track_stock.checked, description: form.elements.description.value.trim(), images
+      })});
+    }
+
+    addProductAttributeButton.addEventListener('click', addProductAttributeRow);
+    productAttributesContainer.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-remove-product-attribute]');
+      if (button) button.closest('[data-product-attribute-row]')?.remove();
+    });
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = {
+        name: form.elements.name.value.trim(),
+        sku: form.elements.sku.dataset.autoGenerated === 'true' ? '' : form.elements.sku.value.trim(),
+        category_id: form.elements.category_id.value || null,
+        status: form.elements.status.value,
+        price: Number(form.elements.price.value || 0),
+        stock_quantity: Number(form.elements.stock_quantity.value || 0),
+        sort_order: Number(form.elements.sort_order.value || 0),
+        track_stock: form.elements.track_stock.checked,
+        description: form.elements.description.value.trim(),
+        attributes: readProductAttributes()
+      };
+      if (!data.name) { formStatus.textContent = 'Product name is required.'; return; }
+      if (!confirm('Create this product?')) return;
+      saveButton.disabled = true;
+      formStatus.textContent = 'Creating product…';
+      try {
+        const saved = await apiFetch('/api/products', { method: 'POST', body: JSON.stringify(data) });
+        await saveProductImages(saved.data.id, Array.from(imageInput.files || []));
+        await shippingController.save(saved.data.id);
+        window.location.href = './product.html?id=' + encodeURIComponent(saved.data.id);
+      } catch (error) {
+        formStatus.textContent = error.message;
+      } finally {
+        saveButton.disabled = false;
+      }
+    });
+
+    addProductAttributeRow();
+    shippingController.load().catch((error) => { formStatus.textContent = error.message; });
+    loadCategories().catch((error) => { formStatus.textContent = error.message; });
+  </script>
+</body>
+</html>

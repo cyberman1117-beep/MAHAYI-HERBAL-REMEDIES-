@@ -1,0 +1,15 @@
+compatibility_date = "2026-09-15"
+
+name = "clothing-store-api"
+main = "src/entry.js"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "clothing-store-db"
+database_id = "32a4cbbf-2994-433e-a34b-349912434a39"
+
+[vars]
+CLOUDINARY_CLOUD_NAME = "f5jirxsl"
+CLOUDINARY_API_KEY = "994725522715656"
+COURIER_GUY_PROVIDER_ID = "CLO259"
+COURIER_GUY_COLLECTION_ADDRESS = "{\"type\":\"business\",\"company\":\"CLOTHING STORE\",\"street_address\":\"250D Church Street\",\"local_area\":\"Nkowankowa Section D\",\"city\":\"Letaba\",\"zone\":\"Limpopo\",\"country\":\"ZA\",\"code\":\"0870\"}"

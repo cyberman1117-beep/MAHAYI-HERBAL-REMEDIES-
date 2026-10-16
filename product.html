@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="View product details." data-product-meta-description>
+  <title>Product | Clothing Store</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="icon" href="" data-store-favicon>
+  <script src="assets/js/site.js" defer></script>
+  <script src="assets/js/cart.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html" aria-label="Clothing Store home"><img class="store-logo" src="" alt="" data-store-logo hidden><span data-store-name>Clothing Store</span></a>
+<nav id="primary-navigation" class="site-nav" aria-label="Primary navigation">
+        <a href="shop.html">Shop</a>
+        <a class="account-link" href="#account"><span aria-hidden="true">○</span><span class="account-label">Account</span></a>
+        <a class="cart-link" href="cart.html" aria-label="Shopping cart"><span aria-hidden="true">Cart</span><span class="cart-count">0</span></a>
+      </nav>
+    </div>
+  </header>
+  <main id="main-content">
+    <section class="section">
+      <div class="container">
+        <p><button class="button product-context-back" type="button" data-context-back>← Back</button></p>
+        <div class="product-detail-layout">
+          <div class="product-gallery" aria-label="Product pictures">
+            <div class="product-gallery-main"><img data-product-main-image src="" alt="" loading="eager"></div>
+            <div class="product-gallery-thumbs" data-product-thumbnails></div>
+          </div>
+          <div class="product-detail-copy">
+            <p class="eyebrow" data-product-category>Loading…</p>
+            <h1 data-product-title>Loading…</h1>
+            <p class="product-detail-price" data-product-price></p>
+            <p class="muted" data-product-status>Loading product…</p>
+            <p class="muted product-attributes" data-product-attributes hidden></p>
+            <div class="settings-group"><p data-product-description class="section-intro"></p></div>
+            <div class="product-option-selector" data-product-group-options hidden>
+              <p class="muted" data-product-group-label></p>
+              <div class="product-option-list" data-product-group-values></div>
+            </div>
+            <div class="product-page-actions"><button class="button button-primary" type="button" data-add-to-cart>Add to cart <span aria-hidden="true">+</span></button><button class="product-buy-now product-buy-now-large" type="button" data-buy-now>Buy now <span aria-hidden="true">↗</span></button></div>
+            <p><a class="button button-ghost" href="index.html#categories">Continue shopping</a></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" data-related-products-section hidden aria-labelledby="related-products-title">
+      <div class="container">
+        <div class="section-heading"><div><p class="eyebrow">More options</p><h2 id="related-products-title">Related products</h2><p class="muted">Explore other products in this group.</p></div></div>
+        <div class="product-grid" data-related-products></div>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="container footer-bottom"><p>© <span data-current-year>2026</span> <span data-store-name>Clothing Store</span>. All rights reserved.<br><span class="footer-signature">Crescosurge <strong>Marketing &amp; Web Development</strong></span></p></div></footer>
+  <script>
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-context-back]');
+      if (!button) return;
+      if (window.history.length > 1) window.history.back();
+      else window.location.href = 'shop.html';
+    });
+  </script>
+  <script type="module" src="assets/js/customer-nav.js"></script>
+  <script src="assets/js/product-page.js" defer></script>
+</body>
+</html>

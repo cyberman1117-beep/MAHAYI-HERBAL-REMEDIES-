@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Clothing Store — modern pieces for your everyday rotation." data-store-meta-description>
+  <title>Clothing Store | Make your mark</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="icon" href="" data-store-favicon>
+  <script src="assets/js/site.js" defer></script>
+  <script src="assets/js/cart.js" defer></script>
+  <script src="assets/js/categories.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html" aria-label="Clothing Store home"><img class="store-logo" src="" alt="" data-store-logo hidden><span data-store-name>Clothing Store</span></a>
+      <nav id="primary-navigation" class="site-nav" aria-label="Primary navigation">
+        <a href="shop.html">Shop</a>
+        <a class="account-link" href="#account"><span aria-hidden="true">○</span><span class="account-label">Account</span></a>
+        <a class="cart-link" href="cart.html" aria-label="Shopping cart, currently empty"><span aria-hidden="true">Cart</span><span class="cart-count">0</span></a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section class="hero" id="story"><div class="container"><div class="hero-copy"><p class="eyebrow" data-store-tagline>The new everyday</p><h1 data-store-hero-headline>Wear what moves you.</h1><p class="hero-text" data-store-description>Modern essentials, unexpected details, and effortless layers made for wherever the day takes you.</p><div class="hero-actions"><a class="button button-primary" href="#categories">Shop <span aria-hidden="true">↗</span></a></div></div></div></section>
+
+    <section class="section" id="new-arrivals" aria-labelledby="new-arrivals-title">
+      <div class="container">
+        <div class="section-heading"><div><p class="eyebrow">Just in</p><h2 id="new-arrivals-title">New Arrivals</h2></div><a class="button button-ghost" href="shop.html">Shop all</a></div>
+        <div class="category-catalogue" data-new-arrivals aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="section" id="promotions" aria-labelledby="promotions-title">
+      <div class="container">
+        <div class="section-heading"><div><p class="eyebrow">Special offers</p><h2 id="promotions-title">Promotions</h2></div><a class="button button-ghost" href="shop.html">Shop all</a></div>
+        <div class="category-catalogue" data-promotions aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="section category-section" id="categories" aria-labelledby="categories-title">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Shop by category</p>
+            <h2 id="categories-title">Categories</h2>
+          </div>
+          <a class="button button-ghost" href="shop.html">Shop all</a>
+        </div>
+
+        <div class="subcategory-showcase" data-subcategory-showcase aria-live="polite"></div>
+        <div class="catalogue-status" data-subcategory-status hidden></div>
+
+        <div data-main-category-sections aria-live="polite"></div>
+        <div class="catalogue-status" data-category-status hidden></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer"><div class="container footer-grid"><div><a class="brand" href="index.html" data-store-name>Clothing Store</a><p class="footer-note">Everyday pieces. Your point of view.</p></div><div class="footer-column"><h3>Explore</h3><a href="#categories">Collections</a><a href="#story">Our story</a></div><div class="footer-column"><h3>Customer care</h3><a href="#account">Account & orders</a><a href="customer-communications.html">Live chat</a></div><div class="footer-column"><h3>Information</h3><div data-information-links><a href="information.html?slug=shipping-policy">Shipping Policy</a><a href="information.html?slug=returns-and-refunds">Returns and Refunds</a><a href="information.html?slug=contact-us">Contact Us</a></div></div><div class="footer-column"><h3>Follow</h3><div data-social-links></div></div></div><div class="container footer-bottom"><p>© <span data-current-year>2026</span> <span data-store-name>Clothing Store</span>. All rights reserved.<br><span class="footer-signature">Crescosurge <strong>Marketing &amp; Web Development</strong></span></p></div></footer>
+  <script type="module" src="assets/js/customer-nav.js"></script>
+</body>
+</html>

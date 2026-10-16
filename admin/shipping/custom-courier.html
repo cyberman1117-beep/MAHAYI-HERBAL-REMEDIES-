@@ -1,0 +1,139 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Custom Couriers | Clothing Store Admin</title><link rel="stylesheet" href="../../assets/css/styles.css"><script type="module" src="../../assets/js/firebase-auth.js"></script><script src="../../assets/js/site.js" defer></script></head><body class="admin-page"><header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span data-admin-account>Admin account</span><button class="button button-small button-outline" data-admin-logout>Log out</button></div></div></header><main class="admin-main"><div class="container"><div class="settings-heading"><div><p class="eyebrow">Shipping configuration</p><h1 data-title>New Custom Courier</h1><p class="muted">Configure this courier customer pricing and parcel rules. The existing packing engine determines the final parcel type, weight and dimensions.</p></div><a class="button button-outline" href="./custom-couriers.html">Back to Custom Couriers</a></div><section class="settings-panel"><form class="settings-form" data-form><input type="hidden" name="id"><div class="settings-fields settings-fields-two"><label class="field"><span>Courier name</span><input name="name" required maxlength="120" placeholder="My Courier"></label><label class="field"><span>Calculation</span><select name="calculation_mode"><option value="fixed">Fixed price</option><option value="weight" selected>Weight based</option><option value="area">Area based</option><option value="weight_area">Weight + area</option></select></label><label class="field field-wide"><span>Description</span><input name="description" maxlength="300"></label><label class="field"><span><input name="is_enabled" type="checkbox" checked> Enabled</span></label></div><h2>Pricing rules</h2><p class="muted">Create one or more customer-facing rates.</p><div data-rates></div><div class="settings-actions"><button class="button button-outline" type="button" data-add>Add pricing rule</button><span class="settings-load-status" data-status>Ready.</span><button class="button button-primary">Save custom courier</button><button class="button button-outline" type="button" data-delete hidden>Delete courier</button></div></form><div class="admin-sections" data-list hidden></div></section></div></main><script type="module">
+async function getToken(){
+  if(typeof window.getAdminIdToken!=="function") throw new Error("Admin authentication is still loading.");
+  const token=await window.getAdminIdToken();
+  if(!token) throw new Error("Authentication required. Please sign in again.");
+  return token;
+}
+async function api(url,options={}){
+  const token=await getToken();
+  const headers=new Headers(options.headers||{});
+  headers.set("Authorization","Bearer "+token);
+  if(options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type","application/json");
+  const response=await fetch(url,{...options,headers});
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok||!payload.success) throw new Error(payload.error||"Request failed.");
+  return payload;
+}
+const params=new URLSearchParams(location.search);
+const courierId=params.get("id");
+const form=document.querySelector("[data-form]");
+const rates=document.querySelector("[data-rates]");
+const status=document.querySelector("[data-status]");
+const title=document.querySelector("[data-title]");
+const deleteButton=document.querySelector("[data-delete]");
+const esc=value=>String(value??"").replace(/[&<>'"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[ch]));
+function row(rate={}){
+  const type=String(rate.packaging_type||"any");
+  return '<div class="admin-panel" data-row><div class="settings-fields settings-fields-two">'+
+    '<label class="field"><span>Service name</span><input name="service_name" required value="'+esc(rate.service_name||"")+'"></label>'+
+    '<label class="field"><span>Area</span><input name="area_name" value="'+esc(rate.area_name||"")+'" placeholder="All areas"></label>'+
+    '<label class="field"><span>Applies to parcel type</span><select name="packaging_type">'+
+      '<option value="any" '+(type==="any"?"selected":"")+'>Any parcel</option>'+
+      '<option value="bag" '+(type==="bag"?"selected":"")+'>Bag / flyer bag</option>'+
+      '<option value="envelope" '+(type==="envelope"?"selected":"")+'>Envelope</option>'+
+      '<option value="box" '+(type==="box"?"selected":"")+'>Box</option>'+
+      '<option value="manufacturer" '+(type==="manufacturer"?"selected":"")+'>Manufacturer packaging</option>'+
+      '<option value="custom" '+(type==="custom"?"selected":"")+'>Custom</option>'+
+    '</select></label>'+
+    '<label class="field"><span>Minimum weight kg</span><input name="min_weight_kg" type="number" min="0" step=".001" value="'+(rate.min_weight_kg??"")+'"></label>'+
+    '<label class="field"><span>Maximum weight kg</span><input name="max_weight_kg" type="number" min="0" step=".001" value="'+(rate.max_weight_kg??"")+'"></label>'+
+    '<label class="field"><span>Maximum length cm</span><input name="max_length_cm" type="number" min="0" step=".1" value="'+(rate.max_length_cm??"")+'"></label>'+
+    '<label class="field"><span>Maximum width cm</span><input name="max_width_cm" type="number" min="0" step=".1" value="'+(rate.max_width_cm??"")+'"></label>'+
+    '<label class="field"><span>Maximum height cm</span><input name="max_height_cm" type="number" min="0" step=".1" value="'+(rate.max_height_cm??"")+'"></label>'+
+    '<label class="field"><span>Customer price ZAR</span><input name="price" type="number" min="0" step=".01" required value="'+(rate.price??0)+'"></label>'+
+    '<label class="field"><span>Estimated delivery</span><input name="estimated_delivery" value="'+esc(rate.estimated_delivery||"")+'" placeholder="2–3 business days"></label>'+
+    '<label class="field"><span><input name="is_enabled" type="checkbox" '+(rate.is_enabled===undefined||Number(rate.is_enabled)?"checked":"")+'> Enabled</span></label>'+
+    '</div><div class="settings-actions"><button class="button button-outline" type="button" data-remove>Remove</button></div></div>';
+}
+function resetNew(){
+  form.reset();
+  form.elements.id.value="";
+  form.elements.calculation_mode.value="weight";
+  form.elements.is_enabled.checked=true;
+  rates.innerHTML=row();
+}
+function field(rowEl,name){return rowEl.querySelector('[name="'+name+'"]');}
+document.querySelector("[data-add]").addEventListener("click",()=>rates.insertAdjacentHTML("beforeend",row()));
+rates.addEventListener("click",event=>{
+  const remove=event.target.closest("[data-remove]");
+  if(remove) remove.closest("[data-row]").remove();
+});
+async function loadCourier(){
+  const result=await api("/api/shipping?include_disabled=1");
+  const method=(result.data||[]).find(item=>String(item.id)===String(courierId));
+  if(!method||method.provider_type!=="custom"||!method.custom_courier) throw new Error("Custom courier not found.");
+  const courier=method.custom_courier;
+  title.textContent="Edit "+method.name;
+  form.elements.id.value=method.id;
+  form.elements.name.value=method.name||"";
+  form.elements.description.value=courier.description||"";
+  form.elements.calculation_mode.value=courier.calculation_mode||"weight";
+  form.elements.is_enabled.checked=Number(method.is_enabled)===1;
+  rates.innerHTML=(courier.rates||[]).map(row).join("")||row();
+  deleteButton.hidden=false;
+  status.textContent="Courier loaded.";
+}
+form.addEventListener("submit",async event=>{
+  event.preventDefault();
+  status.textContent="Saving…";
+  const rateRows=[...rates.querySelectorAll("[data-row]")];
+  const courierRates=rateRows.map((r,index)=>({
+    service_name:field(r,"service_name").value.trim(),
+    area_name:field(r,"area_name").value.trim(),
+    packaging_type:field(r,"packaging_type").value,
+    min_weight_kg:field(r,"min_weight_kg").value===""?null:Number(field(r,"min_weight_kg").value),
+    max_weight_kg:field(r,"max_weight_kg").value===""?null:Number(field(r,"max_weight_kg").value),
+    max_length_cm:field(r,"max_length_cm").value===""?null:Number(field(r,"max_length_cm").value),
+    max_width_cm:field(r,"max_width_cm").value===""?null:Number(field(r,"max_width_cm").value),
+    max_height_cm:field(r,"max_height_cm").value===""?null:Number(field(r,"max_height_cm").value),
+    price:Number(field(r,"price").value||0),
+    estimated_delivery:field(r,"estimated_delivery").value.trim(),
+    is_enabled:field(r,"is_enabled").checked,
+    sort_order:index
+  }));
+  const body={
+    resource:"custom-courier",
+    name:form.elements.name.value.trim(),
+    description:form.elements.description.value.trim(),
+    calculation_mode:form.elements.calculation_mode.value,
+    is_enabled:form.elements.is_enabled.checked,
+    rates:courierRates
+  };
+  try{
+    if(courierId){
+      await api("/api/shipping?resource=custom-courier&id="+encodeURIComponent(courierId),{method:"PUT",body:JSON.stringify(body)});
+      status.textContent="Changes saved.";
+      await loadCourier();
+    }else{
+      const result=await api("/api/shipping",{method:"POST",body:JSON.stringify(body)});
+      const newId=result.data?.id;
+      if(!newId) throw new Error("Courier was created but its id was not returned.");
+      location.href="./custom-courier.html?id="+encodeURIComponent(newId);
+    }
+  }catch(error){status.textContent=error.message;}
+});
+deleteButton.addEventListener("click",async()=>{
+  if(!courierId||!confirm("Delete this custom courier and all pricing rules?")) return;
+  try{
+    await api("/api/shipping?resource=custom-courier&id="+encodeURIComponent(courierId),{method:"DELETE"});
+    location.href="./custom-couriers.html";
+  }catch(error){status.textContent=error.message;}
+});
+(async()=>{
+  try{
+    if(courierId){
+      await loadCourier();
+    }else{
+      resetNew();
+      status.textContent="Ready.";
+    }
+  }catch(error){
+    title.textContent="Custom Courier unavailable";
+    status.textContent=error.message;
+    form.querySelectorAll("input,select,button").forEach(control=>{if(control!==deleteButton)control.disabled=true;});
+  }
+})();
+</script>
+</body>
+</html>

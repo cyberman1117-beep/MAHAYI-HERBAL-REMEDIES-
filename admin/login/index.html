@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sign in to the Clothing Store administration area.">
+  <title>Admin Login | Clothing Store</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <script type="module" src="../../assets/js/firebase-auth.js"></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#login-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a></div></header>
+  <main id="login-main" class="admin-main"><div class="container">
+    <section class="settings-panel" aria-labelledby="login-title">
+      <div class="settings-heading"><div><p class="eyebrow">Secure access</p><h1 id="login-title">Admin sign in</h1><p class="muted">Sign in with the administrator account for this store.</p></div></div>
+      <form class="settings-form" data-admin-login>
+        <fieldset class="settings-group"><legend>Administrator credentials</legend><div class="settings-fields settings-fields-two">
+          <label class="field"><span>Email</span><input name="email" type="email" autocomplete="username" required></label>
+          <label class="field"><span>Password</span><input name="password" type="password" autocomplete="current-password" required></label>
+        </div></fieldset>
+        <div class="settings-actions"><span class="settings-load-status" data-login-status aria-live="polite">Enter your administrator credentials.</span><button class="button button-primary" type="submit">Sign in</button></div>
+      </form>
+    </section>
+  </div></main>
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">Clothing Store</a><p>© <span data-current-year>2026</span> Clothing Store</p><a href="../../index.html">View storefront</a></div></footer>
+  <script src="../../assets/js/site.js" defer></script>
+</body>
+</html>

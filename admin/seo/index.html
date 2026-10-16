@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Manage search engine and SEO settings for the Clothing Store.">
+  <title>SEO / Search Engine | Clothing Store Admin</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <script type="module" src="../../assets/js/firebase-auth.js"></script>
+  <script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#seo-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+  <main id="seo-main" class="admin-main"><div class="container">
+    <div class="settings-heading">
+      <div><p class="eyebrow">Search visibility</p><h1>SEO / Search Engine</h1><p class="muted">All search-engine controls will live here. Existing Store Settings, Shipping, and Information Pages remain unchanged.</p></div>
+      <a class="button button-outline" href="../">Back to dashboard</a>
+    </div>
+    <section class="settings-panel" aria-labelledby="seo-settings-title">
+      <div class="settings-heading"><div><h2 id="seo-settings-title">Search engine settings</h2><p class="muted">These settings control the basic information search engines use when discovering and displaying your storefront.</p></div><span class="settings-readonly">Admin access</span></div>
+      <form class="settings-form" data-seo-form>
+        <fieldset class="settings-group"><legend>Search appearance</legend><div class="settings-fields settings-fields-two">
+          <label class="field field-wide"><span>Site title</span><input name="site_title" type="text" maxlength="160" placeholder="Your store name"></label>
+          <label class="field field-wide"><span>Meta description</span><textarea name="meta_description" rows="4" maxlength="320" placeholder="Describe your store for search results"></textarea></label>
+          <label class="field field-wide"><span>Canonical URL</span><input name="canonical_url" type="url" placeholder="https://your-store.example"></label>
+        </div></fieldset>
+        <fieldset class="settings-group"><legend>Indexing</legend><div class="settings-fields settings-fields-two">
+          <label class="field"><span>Allow search engines to index the site</span><input name="robots_index" type="checkbox" checked></label>
+          <label class="field"><span>Allow search engines to follow links</span><input name="robots_follow" type="checkbox" checked></label>
+        </div><p class="group-help muted">Keep both enabled for a normal public storefront. Disable indexing only when the storefront should not appear in search results.</p></fieldset>
+        <div class="settings-actions"><span class="settings-load-status" data-seo-status aria-live="polite">Loading current SEO settings…</span><button class="button button-primary" type="submit" disabled>Save SEO settings</button></div>
+      </form>
+    </section>
+  </div></main>
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">Clothing Store</a><p>© <span data-current-year>2026</span> Clothing Store</p><a href="../../index.html">View storefront</a></div></footer>
+</body>
+</html>
+
+  <script type="module" src="../../assets/js/seo-settings.js"></script>

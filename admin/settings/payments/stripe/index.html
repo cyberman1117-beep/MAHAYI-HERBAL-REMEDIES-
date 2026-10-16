@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Stripe payment provider setup.">
+  <title>Stripe Setup | Clothing Store Admin</title>
+  <link rel="stylesheet" href="../../../../assets/css/styles.css">
+  <script type="module" src="../../../../assets/js/firebase-auth.js"></script>
+  <script src="../../../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#payment-setup-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner"><a class="brand" href="../../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+  <main id="payment-setup-main" class="admin-main"><div class="container">
+    <div class="settings-heading"><div><p class="eyebrow">Payment provider</p><h1>Stripe setup</h1><p class="muted">Configure this provider for your store. Secret credentials will be connected securely through Cloudflare and will never be exposed to customers.</p></div><a class="button button-outline" href="../../">Back to payment providers</a></div>
+    <section class="settings-panel">
+      <div class="settings-notice" role="status"><strong>Secure configuration.</strong><span>This page will store only non-secret settings in the application. Private API credentials must remain server-side.</span></div>
+      <fieldset class="settings-group">
+        <legend>Stripe</legend>
+        <div class="settings-fields">
+          <p class="muted">Configure the secure connection and choose whether Stripe is enabled for checkout.</p>
+          <p class="settings-load-status">Provider: <strong>Stripe</strong></p>
+          <p class="settings-load-status">Checkout status: <strong data-provider-enabled>Loading…</strong></p>
+          <p class="settings-load-status">Connection status: <strong data-provider-status>Checking…</strong></p>
+          <label class="field"><span>Enable Stripe for checkout</span><span class="settings-option-control"><input type="checkbox" data-provider-enabled-toggle aria-label="Enable Stripe for checkout"><span class="settings-readonly" data-provider-toggle-label>Loading…</span></span></label>
+          <p class="muted" data-provider-configure-hint>Checking secure configuration…</p>
+          <div class="settings-actions"><span class="settings-load-status" data-provider-save-status aria-live="polite"></span><button class="button button-primary" type="button" data-provider-save disabled>Save Stripe settings</button></div>
+        </div>
+      </fieldset>
+    </section>
+  </div></main>
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../../index.html">Clothing Store</a><p>© <span data-current-year>2026</span> Clothing Store</p><a href="../../">Payment providers</a></div></footer>
+  <script type="module">
+    const status = document.querySelector("[data-provider-status]");
+    const enabled = document.querySelector("[data-provider-enabled]");
+    const configureHint = document.querySelector("[data-provider-configure-hint]");
+    const toggle = document.querySelector("[data-provider-enabled-toggle]");
+    const toggleLabel = document.querySelector("[data-provider-toggle-label]");
+    const saveButton = document.querySelector("[data-provider-save]");
+    const saveStatus = document.querySelector("[data-provider-save-status]");
+
+    async function loadProviderStatus() {
+      try {
+        await window.adminAuthReady;
+        const token = await window.getAdminIdToken();
+        const response = await fetch("/api/payment-settings?admin=1&provider=stripe", {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          cache: "no-store"
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.success) throw new Error(payload.error || "Unable to load Stripe configuration.");
+        const provider = payload.data;
+        if (enabled) enabled.textContent = provider.is_enabled ? "Enabled for checkout" : "Not enabled for checkout";
+        if (toggle) toggle.checked = Boolean(provider.is_enabled);
+        if (toggleLabel) toggleLabel.textContent = provider.is_enabled ? "Enabled" : "Disabled";
+        if (status) status.textContent = provider.secret_configured ? "Secret key configured" : "Secret key not configured";
+        if (saveButton) saveButton.disabled = false;
+        if (configureHint) configureHint.textContent = provider.secret_configured
+          ? "The Stripe secret is present server-side. It is never displayed here."
+          : "Add the Stripe secret as a Cloudflare Worker Secret named STRIPE_SECRET_KEY before enabling Stripe for checkout.";
+      } catch (error) {
+        if (status) status.textContent = error.message || "Unable to load configuration.";
+        if (configureHint) configureHint.textContent = "The secure configuration status could not be loaded.";
+      }
+    }
+
+    toggle?.addEventListener("change", () => {
+      if (toggleLabel) toggleLabel.textContent = toggle.checked ? "Enabled" : "Disabled";
+    });
+
+    saveButton?.addEventListener("click", async () => {
+      saveButton.disabled = true;
+      if (saveStatus) saveStatus.textContent = "Saving…";
+      try {
+        await window.adminAuthReady;
+        const token = await window.getAdminIdToken();
+        const response = await fetch("/api/payment-settings", {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json"
+          },
+          body: JSON.stringify({
+            providers: [{
+              provider_key: "stripe",
+              is_enabled: Boolean(toggle?.checked),
+              sort_order: 1
+            }]
+          })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.success) throw new Error(payload.error || "Unable to save Stripe settings.");
+        if (saveStatus) saveStatus.textContent = "Stripe settings saved.";
+        loadProviderStatus();
+      } catch (error) {
+        if (saveStatus) saveStatus.textContent = error.message || "Unable to save settings.";
+      } finally {
+        saveButton.disabled = false;
+      }
+    });
+
+    loadProviderStatus();
+  </script>
+</body>
+</html>

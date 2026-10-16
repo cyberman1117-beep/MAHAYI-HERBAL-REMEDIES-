@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Manage Clothing Store business settings.">
+  <title>Store Settings | Clothing Store Admin</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <script type="module" src="../../assets/js/firebase-auth.js"></script>
+  <script src="../../assets/js/site.js" defer></script>
+  <script type="module" src="../../assets/js/payment-settings.js"></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#settings-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+  <main id="settings-main" class="admin-main"><div class="container">
+    <div class="settings-heading"><div><p class="eyebrow">Store configuration</p><h1>Store settings</h1><p class="muted">Manage the business information that will appear across your public storefront.</p></div><a class="button button-outline" href="../">Back to dashboard</a></div>
+    <section class="settings-panel" aria-labelledby="settings-title"><div class="settings-heading"><div><h2 id="settings-title">Business details</h2><p class="muted">Keep your store identity, contact information, and social links in one place.</p></div><span class="settings-readonly">Admin access</span></div>
+      <div class="settings-notice" role="status"><strong>Changes are protected.</strong><span>Your authenticated admin session is required to save updates, and each save asks for confirmation.</span></div>
+      <form class="settings-form" data-settings-form>
+        <fieldset class="settings-group"><legend>Store identity</legend><div class="settings-fields settings-fields-two"><label class="field"><span>Store / brand name</span><input name="store_name" type="text" autocomplete="organization" placeholder="Your store name"></label><label class="field"><span>Tagline</span><input name="tagline" type="text" placeholder="A short line about your store"></label><label class="field field-wide"><span>Main hero headline</span><input name="hero_headline" type="text" placeholder="Wear what moves you."></label><label class="field field-wide"><span>Store description</span><textarea name="description" rows="4" placeholder="Describe the store and its point of view"></textarea></label><div class="field field-wide"><span>Store logo</span><input name="logo_file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"><input name="logo_url" type="hidden"><small>Select the logo image from your device. It will be uploaded securely and used in the storefront header and browser tab icon.</small><div class="store-logo-preview" data-store-logo-preview hidden><img data-store-logo-preview-image alt="Current store logo"></div><button class="button button-small button-outline" type="button" data-remove-logo>Remove logo</button></div></div></fieldset>
+        <fieldset class="settings-group"><legend>Contact information</legend><div class="settings-fields settings-fields-two"><label class="field"><span>Email</span><input name="contact_email" type="email" autocomplete="email" placeholder="hello@example.com"></label><label class="field"><span>Phone</span><input name="contact_phone" type="tel" autocomplete="tel" placeholder="+1 000 000 0000"></label><label class="field"><span>WhatsApp URL</span><input name="whatsapp_url" type="url" placeholder="https://wa.me/..." autocomplete="url"></label><label class="field"><span>Address</span><input name="address" type="text" autocomplete="street-address" placeholder="Store address"></label></div></fieldset>
+        <fieldset class="settings-group"><legend>Email notifications</legend><p class="group-help muted">Configure the sender and notification types. Provider credentials are kept securely in Cloudflare and are never stored in GitHub or this form.</p><div class="settings-fields settings-fields-two"><label class="field"><span>Enable transactional email</span><input name="email_enabled" type="checkbox"></label><label class="field"><span>Email provider</span><select name="email_provider"><option value="gmail">Google Gmail</option><option value="resend">Resend</option></select></label><label class="field"><span>Sender name</span><input name="email_sender_name" type="text" autocomplete="organization" placeholder="Your Store"></label><label class="field"><span>Sender email</span><input name="email_sender_email" type="email" autocomplete="email" placeholder="orders@example.com"></label><label class="field"><span>Reply-to email</span><input name="email_reply_to" type="email" autocomplete="email" placeholder="support@example.com"></label><label class="field"><span>Order confirmation emails</span><input name="email_notify_order_confirmation" type="checkbox" checked></label><label class="field"><span>Order status emails</span><input name="email_notify_order_status" type="checkbox" checked></label><label class="field"><span>New chat notifications</span><input name="email_notify_new_chat" type="checkbox" checked></label></div></fieldset>
+        <fieldset class="settings-group"><legend>Social media</legend><p class="group-help muted">Enable only the platforms your business uses. Enabled links can appear in the public storefront later.</p><div class="social-list" data-social-list></div></fieldset>
+        <div class="settings-actions"><span class="settings-load-status" data-settings-status aria-live="polite">Loading current settings…</span><button class="button button-primary" type="submit" disabled>Save settings</button></div>
+      </form>
+    </section>
+    <section class="settings-panel" aria-labelledby="payment-settings-title">
+      <div class="settings-heading">
+        <div><h2 id="payment-settings-title">Payment providers</h2><p class="muted">Choose which payment providers your customers can use at checkout. Provider credentials are configured separately and are never stored in the public website.</p></div>
+        <span class="settings-readonly">Admin access</span>
+      </div>
+      <form class="settings-form" id="payment-settings-form" data-payment-settings-form>
+        <fieldset class="settings-group">
+          <legend>Available payment providers</legend>
+          <p class="group-help muted">Enable the providers that this business has configured and wants to offer to customers.</p>
+          <div class="settings-options" data-payment-provider-list></div>
+        </fieldset>
+        <div class="settings-actions">
+          <span class="settings-load-status" data-payment-settings-status aria-live="polite">Loading payment providers…</span>
+          <button class="button button-primary" type="submit" disabled>Save payment providers</button>
+        </div>
+      </form>
+    </section>
+  </div></main>
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">Clothing Store</a><p>© <span data-current-year>2026</span> Clothing Store</p><a href="../">Back to dashboard</a></div></footer>
+</body>
+</html>

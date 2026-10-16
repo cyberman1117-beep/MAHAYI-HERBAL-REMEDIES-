@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Packaging | Clothing Store Admin</title>
+<link rel="stylesheet" href="../../assets/css/styles.css">
+<script type="module" src="../../assets/js/firebase-auth.js"></script>
+<script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+<header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span data-admin-account>Admin account</span><button class="button button-small button-outline" data-admin-logout>Log out</button></div></div></header>
+<main class="admin-main"><div class="container">
+<div class="settings-heading">
+  <div><p class="eyebrow">Shipping configuration</p><h1 data-title>New Packaging</h1><p class="muted">Configure the packaging used by the packing engine, including its available stock and packed limits.</p></div>
+  <a class="button button-outline" href="./packaging.html">Back to Packaging</a>
+</div>
+<section class="settings-panel">
+<form class="settings-form" data-form>
+<input type="hidden" name="id">
+<div class="settings-fields settings-fields-two">
+<label class="field"><span>Packaging name</span><input name="name" required maxlength="120"></label>
+<label class="field"><span>Packaging type</span><select name="packaging_type"><option value="bag">Bag</option><option value="box">Box</option><option value="envelope">Envelope</option><option value="manufacturer">Manufacturer packaging</option><option value="custom">Custom</option></select></label>
+<label class="field"><span>Length (cm)</span><input name="length_cm" type="number" min="0" step=".1"></label>
+<label class="field"><span>Width (cm)</span><input name="width_cm" type="number" min="0" step=".1"></label>
+<label class="field"><span>Height (cm)</span><input name="height_cm" type="number" min="0" step=".1"></label>
+<label class="field"><span>Packaging weight (kg)</span><input name="packaging_weight_kg" type="number" min="0" step=".001" value="0"></label>
+<label class="field"><span>Maximum packed weight (kg)</span><input name="max_weight_kg" type="number" min="0" step=".001"></label>
+<label class="field"><span>Available stock</span><input name="stock_quantity" type="number" min="0" step="1" value="0"></label>
+<label class="field"><span>Sort order</span><input name="sort_order" type="number" min="0" step="1" value="0"></label>
+<label class="field"><span><input name="is_enabled" type="checkbox" checked> Enabled</span></label>
+</div>
+<div class="settings-actions">
+<span class="settings-load-status" data-status>Ready.</span>
+<div><button class="button button-outline" type="button" data-delete hidden>Delete packaging</button> <button class="button button-primary" type="submit" data-save>Save packaging</button></div>
+</div>
+</form>
+</section>
+</div></main>
+<script type="module">
+async function getToken(){
+  if(typeof window.getAdminIdToken!=="function") throw new Error("Admin authentication is still loading.");
+  const token=await window.getAdminIdToken();
+  if(!token) throw new Error("Authentication required. Please sign in again.");
+  return token;
+}
+async function api(url,options={}){
+  const token=await getToken();
+  const headers=new Headers(options.headers||{});
+  headers.set("Authorization","Bearer "+token);
+  if(options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type","application/json");
+  const response=await fetch(url,{...options,headers});
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok||!payload.success) throw new Error(payload.error||"Request failed.");
+  return payload;
+}
+const id=new URLSearchParams(location.search).get("id");
+const form=document.querySelector("[data-form]");
+const title=document.querySelector("[data-title]");
+const status=document.querySelector("[data-status]");
+const deleteButton=document.querySelector("[data-delete]");
+const saveButton=document.querySelector("[data-save]");
+
+function setValue(name,value){form.elements[name].value=value??"";}
+function resetNew(){
+  form.reset();
+  setValue("id","");
+  form.elements.packaging_type.value="bag";
+  form.elements.packaging_weight_kg.value="0";
+  form.elements.stock_quantity.value="0";
+  form.elements.sort_order.value="0";
+  form.elements.is_enabled.checked=true;
+  status.textContent="Ready.";
+}
+function packagingBody(){
+  const num=(name)=>form.elements[name].value===""?null:Number(form.elements[name].value);
+  return {
+    resource:"packaging",
+    name:form.elements.name.value.trim(),
+    packaging_type:form.elements.packaging_type.value,
+    length_cm:num("length_cm"),
+    width_cm:num("width_cm"),
+    height_cm:num("height_cm"),
+    packaging_weight_kg:Number(form.elements.packaging_weight_kg.value||0),
+    max_weight_kg:num("max_weight_kg"),
+    stock_quantity:Math.max(0,Math.floor(Number(form.elements.stock_quantity.value||0))),
+    is_enabled:form.elements.is_enabled.checked,
+    sort_order:Math.max(0,Math.floor(Number(form.elements.sort_order.value||0)))
+  };
+}
+async function loadPackaging(){
+  const result=await api("/api/shipping?include_disabled=1");
+  const packaging=(result.packaging||[]).find(item=>String(item.id)===String(id));
+  if(!packaging) throw new Error("Packaging not found.");
+  title.textContent="Edit "+packaging.name;
+  setValue("id",packaging.id);
+  setValue("name",packaging.name);
+  setValue("packaging_type",packaging.packaging_type);
+  setValue("length_cm",packaging.length_cm);
+  setValue("width_cm",packaging.width_cm);
+  setValue("height_cm",packaging.height_cm);
+  setValue("packaging_weight_kg",packaging.packaging_weight_kg);
+  setValue("max_weight_kg",packaging.max_weight_kg);
+  setValue("stock_quantity",packaging.stock_quantity);
+  setValue("sort_order",packaging.sort_order);
+  form.elements.is_enabled.checked=Number(packaging.is_enabled)===1;
+  deleteButton.hidden=false;
+  status.textContent="Packaging loaded.";
+}
+form.addEventListener("submit",async event=>{
+  event.preventDefault();
+  status.textContent="Saving…";
+  saveButton.disabled=true;
+  try{
+    const body=packagingBody();
+    if(!body.name){status.textContent="Packaging name is required.";return;}
+    if(id){
+      await api("/api/shipping?resource=packaging&id="+encodeURIComponent(id),{method:"PUT",body:JSON.stringify(body)});
+      await loadPackaging();
+      status.textContent="Changes saved.";
+    }else{
+      const result=await api("/api/shipping",{method:"POST",body:JSON.stringify(body)});
+      const newId=result.data?.id;
+      if(!newId) throw new Error("Packaging was created but its id was not returned.");
+      location.href="./packaging-detail.html?id="+encodeURIComponent(newId);
+    }
+  }catch(error){status.textContent=error.message;}
+  finally{saveButton.disabled=false;}
+});
+deleteButton.addEventListener("click",async()=>{
+  if(!id||!confirm("Delete this packaging definition?")) return;
+  deleteButton.disabled=true;
+  try{
+    await api("/api/shipping?resource=packaging&id="+encodeURIComponent(id),{method:"DELETE"});
+    location.href="./packaging.html";
+  }catch(error){status.textContent=error.message;deleteButton.disabled=false;}
+});
+(async()=>{
+  try{if(id) await loadPackaging(); else resetNew();}
+  catch(error){
+    title.textContent="Packaging unavailable";
+    status.textContent=error.message;
+    form.querySelectorAll("input,select,button").forEach(control=>control.disabled=true);
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Manage independent product promotions for the Clothing Store.">
+  <title>Promotions | Clothing Store Admin</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <script type="module" src="../../assets/js/firebase-auth.js"></script>
+  <script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+<a class="skip-link" href="#promotions-main">Skip to content</a>
+<header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+<main id="promotions-main" class="admin-main"><div class="container">
+  <div class="settings-heading"><div><p class="eyebrow">Independent merchandising</p><h1>Promotions</h1><p class="muted">Enable promotional pricing independently from categories and catalogue product details.</p></div><div><a class="button button-outline" href="./">Back to categories</a><button class="button button-outline" type="button" data-refresh>Refresh</button></div></div>
+  <section class="settings-panel"><div class="settings-notice" data-status role="status">Loading products…</div><div class="admin-sections" data-list></div></section>
+</div></main>
+<footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">Clothing Store</a><p>© <span data-current-year>2026</span> Clothing Store</p><a href="./">Back to categories</a></div></footer>
+<script type="module">
+const list=document.querySelector('[data-list]'),status=document.querySelector('[data-status]');
+const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+async function token(){if(typeof window.getAdminIdToken!=='function')throw Error('Admin authentication is still loading.');const t=await window.getAdminIdToken();if(!t)throw Error('Authentication required. Please sign in again.');return t;}
+async function api(url,options={}){const t=await token(),h=new Headers(options.headers||{});h.set('Authorization','Bearer '+t);if(options.body)h.set('Content-Type','application/json');const r=await fetch(url,{...options,headers:h}),p=await r.json().catch(()=>({}));if(!r.ok||!p.success)throw Error(p.error||'Request failed.');return p;}
+async function load(){status.textContent='Loading products…';try{const p=await api('/api/product-merchandising');const products=p.data?.products||[];status.textContent=products.length+' product'+(products.length===1?'':'s')+' loaded.';list.innerHTML='';for(const x of products){const enabled=Number(x.promotion_enabled)===1;const current=Number(x.promotion_price||0);const panel=document.createElement('section');panel.className='admin-panel';panel.innerHTML=`
+<div class="panel-icon">PR</div><div><h2>${esc(x.name)}</h2><p class="muted">${esc(x.sku||'No SKU')} · Regular price: R${Number(x.price||0).toFixed(2)}</p><p class="muted" data-promotion-info>${enabled?'Promotion active at R'+current.toFixed(2):'Promotion not enabled.'}</p></div>
+<div class="settings-fields settings-fields-two" style="min-width:min(100%,360px)"><label class="field"><span><input type="checkbox" data-enabled ${enabled?'checked':''}> Promotion enabled</span></label><label class="field"><span>Promotion price (ZAR)</span><input type="number" min="0" step="0.01" inputmode="decimal" value="${current.toFixed(2)}" data-price></label><button class="button button-primary" type="button" data-save>Save</button></div>`;
+panel.querySelector('[data-save]').addEventListener('click',async()=>{const b=panel.querySelector('[data-save]'),enabled=panel.querySelector('[data-enabled]').checked,price=Math.max(0,Number(panel.querySelector('[data-price]').value)||0);if(enabled&&price<=0){status.textContent='Enter a promotion price greater than R0.00 before enabling this promotion.';return;}b.disabled=true;b.textContent='Saving…';try{const saved=await api('/api/product-merchandising?product_id='+encodeURIComponent(x.id),{method:'PUT',body:JSON.stringify({promotion:{enabled,price}})});const v=saved.data?.product;if(v){const n=Number(v.promotion_price||0);panel.querySelector('[data-promotion-info]').textContent=Number(v.promotion_enabled)===1?'Promotion active at R'+n.toFixed(2):'Promotion not enabled.';}status.textContent='Saved '+x.name+'.';}catch(e){status.textContent=e.message;}finally{b.disabled=false;b.textContent='Save';}});list.append(panel);}}catch(e){status.textContent=e.message;}}
+document.querySelector('[data-refresh]').addEventListener('click',load);load();
+</script>
+</body>
+</html>

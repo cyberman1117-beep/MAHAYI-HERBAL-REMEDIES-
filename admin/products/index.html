@@ -1,0 +1,973 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Manage products for the Clothing Store.">
+  <title>Products | Clothing Store Admin</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <script type="module" src="../../assets/js/firebase-auth.js"></script>
+  <script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#products-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">Clothing Store <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+
+  <main id="products-main" class="admin-main"><div class="container">
+    <div class="settings-heading">
+      <div><p class="eyebrow">Catalogue management</p><h1>Products</h1><p class="muted">View and manage the products currently in your store.</p></div>
+      <div>
+        <a class="button button-outline" href="../">Back to dashboard</a>
+        <a class="button button-primary" href="./add.html">+ Add New Product</a>
+      </div>
+    </div>
+
+    <section class="settings-panel" aria-labelledby="group-management-title">
+      <div class="settings-heading">
+        <div><p class="eyebrow">Product relationships</p><h2 id="group-management-title">Product Groups</h2><p class="muted">Create and manage groups that connect separate catalogue products.</p></div>
+        <a class="button button-primary" href="./group-create.html">+ Create Group</a>
+      </div>
+      <div class="admin-sections" data-groups-list></div>
+    </section>
+    <section class="settings-panel" aria-labelledby="product-form-title" data-product-form-panel hidden>
+      <div class="settings-heading"><div><h2 id="product-form-title">Add product</h2><p class="muted">Add the product details and one or more pictures. Images are stored securely through Cloudinary.</p></div><span class="settings-readonly">Admin access</span></div>
+      <form class="settings-form" data-product-form>
+        <input type="hidden" name="id">
+        <fieldset class="settings-group"><legend>Product details</legend>
+          <div class="settings-fields settings-fields-two">
+            <label class="field"><span>Product name</span><input name="name" type="text" required maxlength="160" placeholder="Product name"></label>
+            <label class="field"><span>SKU</span><input name="sku" type="text" maxlength="80" placeholder="Auto-generated SKU"><small class="muted">Generated from the product name. You can edit it if needed.</small></label>
+            <label class="field" data-group-form-field hidden><span>Product group</span><select name="product_group_id"><option value="">No group</option></select><small class="muted">Optional. When a group is selected, choose one of its predefined options.</small></label>
+            <label class="field" data-group-form-field hidden><span>Group option</span><select name="product_group_option_id" disabled><option value="">No group option</option></select><small class="muted" data-group-option-help>Select a product group first.</small></label>
+            <label class="field"><span>Category / subcategory</span><select name="category_id"><option value="">Uncategorized</option></select></label>
+            <label class="field"><span>Status</span><select name="status"><option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option></select></label>
+            <label class="field"><span>Price (ZAR)</span><input name="price" type="number" min="0" step="0.01" inputmode="decimal" value="0"></label>
+            <label class="field"><span>Stock quantity</span><input name="stock_quantity" type="number" min="0" step="1" inputmode="numeric" value="0"><small class="muted">For grouped products this is prefilled from the selected group option, but can be adjusted for the actual product.</small></label>
+            <label class="field"><span>Sort order</span><input name="sort_order" type="number" min="0" step="1" inputmode="numeric" value="0"></label>
+            <label class="field"><span><input name="track_stock" type="checkbox" checked> Track stock</span></label>
+            <label class="field field-wide"><span>Description</span><textarea name="description" rows="5" maxlength="5000" placeholder="Describe the product"></textarea></label>
+            <label class="field field-wide"><span>Product pictures</span><input name="images" type="file" accept="image/*" multiple><small class="muted">You can select multiple pictures. Maximum 10 MB per picture.</small></label>
+            <div class="field field-wide"><span>Selected pictures</span><p class="muted" data-image-selection>No pictures selected.</p></div>
+          </div>
+        </fieldset>
+        <fieldset class="settings-group"><legend>Shipping</legend>
+          <p class="muted">Shipping classification controls what information the packing engine needs. Packaging itself is configured separately under Admin → Shipping.</p>
+          <div class="settings-fields settings-fields-two">
+            <label class="field"><span>Shipping type</span><select name="shipping_type_id"><option value="">No shipping type yet</option></select><small class="muted" data-shipping-help>Select a shipping type for this product.</small></label>
+            <label class="field"><span>Packaging state</span><select name="shipping_packaging_mode"><option value="">Select shipping type first</option><option value="compressible">Compressible / can be packed into a bag</option><option value="prepacked">Already packaged / boxed</option></select><small class="muted" data-shipping-mode-help>Use “already packaged” for products such as shoes or manufacturer-boxed goods.</small></label>
+            <label class="field"><span>Shipping weight (kg)</span><input name="shipping_weight_kg" type="number" min="0" step="0.001" inputmode="decimal" placeholder="e.g. 1.5"></label>
+            <div class="field" data-shipping-dimensions>
+              <span>Packed dimensions (cm)</span>
+              <div class="settings-fields settings-fields-three">
+                <label class="field"><span>Length</span><input name="shipping_length_cm" type="number" min="0" step="0.1" inputmode="decimal"></label>
+                <label class="field"><span>Width</span><input name="shipping_width_cm" type="number" min="0" step="0.1" inputmode="decimal"></label>
+                <label class="field"><span>Height</span><input name="shipping_height_cm" type="number" min="0" step="0.1" inputmode="decimal"></label>
+              </div>
+              <small class="muted" data-shipping-dimensions-help>Dimensions are required for rigid or prepacked products.</small>
+            </div>
+          </div>
+        </fieldset>
+        <fieldset class="settings-group"><legend>Product attributes</legend>
+          <p class="muted">Attributes belong to this individual product. They are independent of product-group relationships.</p>
+          <div class="settings-fields settings-fields-two" data-product-attributes></div>
+          <div class="settings-actions"><button class="button button-outline" type="button" data-add-product-attribute>+ Add attribute</button></div>
+        </fieldset>
+        <div class="settings-actions"><span class="settings-load-status" data-form-status aria-live="polite">Ready to add a product.</span><div><button class="button button-outline" type="button" data-cancel-edit hidden>Cancel edit</button> <button class="button button-primary" type="submit" data-save-product>Save product</button></div></div>
+      </form>
+    </section>
+
+    <section class="settings-panel" aria-labelledby="catalogue-title">
+      <div class="settings-heading"><div><h2 id="catalogue-title">Catalogue</h2><p class="muted">Products currently stored in the catalogue.</p></div><button class="button button-outline" type="button" data-refresh-products>Refresh</button></div>
+      <div class="product-filter-navigation" aria-label="Product filters">
+        <div class="product-filter-tabs" role="tablist" aria-label="Catalogue filter">
+          <button class="product-filter-tab is-active" type="button" role="tab" aria-selected="true" data-product-filter-tab="all">All Products</button>
+          <button class="product-filter-tab" type="button" role="tab" aria-selected="false" data-product-filter-tab="categories">Categories</button>
+          <button class="product-filter-tab" type="button" role="tab" aria-selected="false" data-product-filter-tab="groups">Groups</button>
+        </div>
+        <div class="product-filter-panel" data-product-filter-panel hidden></div>
+      </div>
+      <div class="product-search-row">
+        <label class="field">
+          <span>Search products</span>
+          <input type="search" data-product-search placeholder="Search by product name or SKU" autocomplete="off">
+        </label>
+      </div>
+      <div class="settings-notice" data-list-status role="status">Loading products…</div>
+      <div class="admin-sections" data-products-list></div>
+    </section>
+  </div></main>
+
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">Clothing Store</a><p>© <span data-current-year>2026</span> Clothing Store</p><a href="../">Back to dashboard</a></div></footer>
+
+  <script type="module">
+    const productAttributesContainer = document.querySelector('[data-product-attributes]');
+    const addProductAttributeButton = document.querySelector('[data-add-product-attribute]');
+    const productAttributeNames = ['Color', 'Size', 'Material', 'Weight', 'Dimensions', 'Capacity'];
+    const productAttributeUnits = {
+      Weight: ['g', 'kg', 'mg', 'lb', 'oz'],
+      Dimensions: ['mm', 'cm', 'm', 'in', 'ft'],
+      Capacity: ['mL', 'L', 'cL', 'dL', 'gal', 'fl oz']
+    };
+    const productAttributeColors = [
+      ['Black', '#000000'], ['White', '#ffffff'], ['Red', '#dc2626'], ['Blue', '#2563eb'],
+      ['Green', '#16a34a'], ['Yellow', '#facc15'], ['Orange', '#f97316'], ['Purple', '#9333ea'],
+      ['Pink', '#ec4899'], ['Brown', '#92400e'], ['Grey', '#6b7280'], ['Beige', '#d6c3a5'],
+      ['Navy', '#1e3a8a'], ['Maroon', '#7f1d1d'], ['Burgundy', '#800020'], ['Cream', '#fff7d6'],
+      ['Khaki', '#c3b091'], ['Olive', '#808000'], ['Teal', '#0f766e'], ['Turquoise', '#14b8a6'],
+      ['Gold', '#d4af37'], ['Silver', '#c0c0c0']
+    ];
+
+    function parseAttributeMeasurement(value, units) {
+      const text = String(value || '').trim();
+      const match = text.match(/^([+-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+))\\s*(.+)$/);
+      if (!match) return { number: text, unit: units[0] };
+      const unit = units.find((item) => item.toLowerCase() === match[2].trim().toLowerCase());
+      return { number: match[1], unit: unit || units[0] };
+    }
+
+    function attributeValueMarkup(name, value) {
+      if (name.toLowerCase() === 'color') {
+        const selectedColor = productAttributeColors.find((item) => item[0].toLowerCase() === String(value || '').trim().toLowerCase());
+        const buttons = productAttributeColors.map(([colorName, hex]) => {
+          const selected = selectedColor?.[0].toLowerCase() === colorName.toLowerCase();
+          return '<button class="product-color-swatch product-attribute-color-swatch' + (selected ? ' is-selected' : '') + '" type="button" data-product-attribute-color="' + escapeHtml(colorName) + '" aria-pressed="' + (selected ? 'true' : 'false') + '" title="' + escapeHtml(colorName) + '"><span class="product-color-swatch-dot" style="background:' + hex + ';"></span><span>' + escapeHtml(colorName) + '</span></button>';
+        }).join('');
+        return '<div class="product-color-palette product-attribute-color-palette" data-product-attribute-color-palette>' + buttons + '</div><input data-product-attribute-value type="hidden" value="' + escapeHtml(selectedColor?.[0] || String(value || '')) + '">';
+      }
+
+      const units = productAttributeUnits[name];
+      if (units) {
+        const parsed = parseAttributeMeasurement(value, units);
+        return '<div class="settings-fields settings-fields-two product-attribute-measurement"><label class="field"><span>Value</span><input data-product-attribute-number type="number" step="any" inputmode="decimal" value="' + escapeHtml(parsed.number) + '" placeholder="Enter number"></label><label class="field"><span>Unit</span><select data-product-attribute-unit>' + units.map((unit) => '<option value="' + escapeHtml(unit) + '"' + (unit.toLowerCase() === parsed.unit.toLowerCase() ? ' selected' : '') + '>' + escapeHtml(unit) + '</option>').join('') + '</select></label></div>';
+      }
+
+      return '<input data-product-attribute-value type="text" maxlength="500" placeholder="Enter ' + escapeHtml(name.toLowerCase()) + '" value="' + escapeHtml(value || '') + '">';
+    }
+
+    function addProductAttributeRow(attribute = {}) {
+      const row = document.createElement('div');
+      row.className = 'settings-fields settings-fields-two product-attribute-row';
+      row.dataset.productAttributeRow = '';
+      const selectedName = String(attribute.name || '');
+      const value = String(attribute.value || '');
+      row.innerHTML = `
+        <label class="field">
+          <span>Attribute</span>
+          <select data-product-attribute-name>
+            <option value="">Select attribute</option>
+            ${productAttributeNames.map((name) => '<option value="' + escapeHtml(name) + '"' + (selectedName.toLowerCase() === name.toLowerCase() ? ' selected' : '') + '>' + escapeHtml(name) + '</option>').join('')}
+            <option value="custom"${selectedName && !productAttributeNames.some((name) => name.toLowerCase() === selectedName.toLowerCase()) ? ' selected' : ''}>Custom attribute</option>
+          </select>
+          <input data-product-attribute-custom type="text" maxlength="80" placeholder="Custom attribute name" value="${selectedName && !productAttributeNames.some((name) => name.toLowerCase() === selectedName.toLowerCase()) ? escapeHtml(selectedName) : ''}" hidden>
+        </label>
+        <label class="field field-wide" data-product-attribute-value-field>
+          <span>Value</span>
+          <div data-product-attribute-editor>${attributeValueMarkup(selectedName, value)}</div>
+        </label>
+        <div class="field">
+          <button class="button button-small button-outline" type="button" data-remove-product-attribute>Remove</button>
+        </div>`;
+      productAttributesContainer.append(row);
+
+      const select = row.querySelector('[data-product-attribute-name]');
+      const customInput = row.querySelector('[data-product-attribute-custom]');
+      const editor = row.querySelector('[data-product-attribute-editor]');
+      const syncCustom = () => {
+        customInput.hidden = select.value !== 'custom';
+      };
+      const renderValueEditor = (preserveValue = true) => {
+        const oldName = row.dataset.attributeName || '';
+        const oldValue = preserveValue ? readAttributeRowValue(row) : '';
+        row.dataset.attributeName = select.value;
+        editor.innerHTML = attributeValueMarkup(select.value, oldName && oldName.toLowerCase() === select.value.toLowerCase() ? oldValue : '');
+        row.querySelector('[data-product-attribute-value-field] > span').textContent = select.value === 'Color' ? 'Color' : select.value || 'Value';
+      };
+
+      row.dataset.attributeName = selectedName;
+      select.addEventListener('change', () => {
+        syncCustom();
+        renderValueEditor(true);
+      });
+      row.addEventListener('click', (event) => {
+        const colorButton = event.target.closest('[data-product-attribute-color]');
+        if (!colorButton) return;
+        const valueInput = row.querySelector('[data-product-attribute-value]');
+        if (!valueInput) return;
+        valueInput.value = colorButton.dataset.productAttributeColor;
+        row.querySelectorAll('[data-product-attribute-color]').forEach((button) => {
+          const selected = button === colorButton;
+          button.classList.toggle('is-selected', selected);
+          button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        });
+      });
+      syncCustom();
+      return row;
+    }
+
+    function readAttributeRowValue(row) {
+      const name = row.dataset.attributeName || row.querySelector('[data-product-attribute-name]')?.value || '';
+      const colorValue = row.querySelector('[data-product-attribute-value]');
+      if (name.toLowerCase() === 'color' && colorValue) return colorValue.value.trim();
+
+      const numberInput = row.querySelector('[data-product-attribute-number]');
+      const unitSelect = row.querySelector('[data-product-attribute-unit]');
+      if (numberInput && unitSelect) {
+        const number = numberInput.value.trim();
+        const unit = unitSelect.value.trim();
+        return number ? number + ' ' + unit : '';
+      }
+
+      return colorValue?.value.trim() || row.querySelector('[data-product-attribute-custom]')?.value.trim() || '';
+    }
+
+    function readProductAttributes() {
+      return Array.from(productAttributesContainer.querySelectorAll('[data-product-attribute-row]'))
+        .map((row) => {
+          const select = row.querySelector('[data-product-attribute-name]');
+          const custom = row.querySelector('[data-product-attribute-custom]');
+          const name = select.value === 'custom' ? custom.value.trim() : select.value.trim();
+          row.dataset.attributeName = name;
+          return { name, value: readAttributeRowValue(row) };
+        })
+        .filter((attribute) => attribute.name && attribute.value);
+    }
+
+    function resetProductAttributes() {
+      productAttributesContainer.innerHTML = '';
+    }
+
+    addProductAttributeButton.addEventListener('click', () => addProductAttributeRow());
+    productAttributesContainer.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-remove-product-attribute]');
+      if (button) button.closest('[data-product-attribute-row]')?.remove();
+    });
+
+
+    const form = document.querySelector('[data-product-form]');
+    const formPanel = document.querySelector('[data-product-form-panel]');
+    const groupsList = document.querySelector('[data-groups-list]');
+    const productGroupSelect = form.elements.product_group_id;
+    const productGroupOptionSelect = form.elements.product_group_option_id;
+    const shippingTypeSelect = form.elements.shipping_type_id;
+    const shippingModeSelect = form.elements.shipping_packaging_mode;
+    const shippingDimensions = document.querySelector('[data-shipping-dimensions]');
+    const shippingHelp = document.querySelector('[data-shipping-help]');
+    const shippingModeHelp = document.querySelector('[data-shipping-mode-help]');
+    const shippingDimensionsHelp = document.querySelector('[data-shipping-dimensions-help]');
+    let shippingTypes = [];
+    const groupOptionHelp = document.querySelector('[data-group-option-help]');
+    const formStatus = document.querySelector('[data-form-status]');
+    const groupFormFields = Array.from(document.querySelectorAll('[data-group-form-field]'));
+    function setFormStatus(message) { formStatus.textContent = message; }
+    function setProductFormMode(mode) {
+      const isGroupMode = mode === 'group';
+      for (const field of groupFormFields) field.hidden = !isGroupMode;
+    }
+    const listStatus = document.querySelector('[data-list-status]');
+    const list = document.querySelector('[data-products-list]');
+    const productSearch = document.querySelector('[data-product-search]');
+    const productFilterTabs = Array.from(document.querySelectorAll('[data-product-filter-tab]'));
+    const productFilterPanel = document.querySelector('[data-product-filter-panel]');
+    let activeProductFilter = 'all';
+    let selectedCategoryId = '';
+    let selectedGroupId = '';
+    const categorySelect = form.elements.category_id;
+    const imageInput = form.elements.images;
+    const imageSelection = document.querySelector('[data-image-selection]');
+    const cancelButton = document.querySelector('[data-cancel-edit]');
+    const saveButton = document.querySelector('[data-save-product]');
+    let products = [];
+    let existingImages = [];
+    let productGroups = [];
+    function getSelectedGroup() { return productGroups.find((group) => String(group.id) === String(productGroupSelect.value)) || null; }
+    function skuToken(value) {
+      const words = String(value || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().split(/\\s+/).filter(Boolean);
+      if (!words.length) return 'PROD';
+      if (words.length === 1) return words[0].slice(0, 6);
+      return words.map((word) => word[0]).join('').slice(0, 6);
+    }
+    function previewSku(name, option = '') {
+      const base = skuToken(name);
+      const optionToken = option ? skuToken(option).slice(0, 6) : '';
+      return optionToken ? base + '-' + optionToken + '-001' : base + '-001';
+    }
+
+    function updateProductGroupOptions(selectedId = '') {
+      const group = getSelectedGroup();
+      productGroupOptionSelect.innerHTML = '<option value="">No group option</option>';
+      productGroupOptionSelect.disabled = !group;
+      if (!group) { groupOptionHelp.textContent = 'Select a product group first.'; return; }
+      groupOptionHelp.textContent = 'Choose the predefined option this product represents.';
+      for (const option of (group.options || [])) {
+        const item = document.createElement('option');
+        item.value = option.id;
+        item.textContent = option.value + (option.sku ? ' · ' + option.sku : '');
+        item.dataset.quantity = option.quantity;
+        item.dataset.sku = option.sku || '';
+        item.dataset.value = option.value;
+        if (String(option.id) === String(selectedId)) item.selected = true;
+        productGroupOptionSelect.append(item);
+      }
+      if (!productGroupOptionSelect.value && group.options?.length === 1) productGroupOptionSelect.value = String(group.options[0].id);
+    }
+    form.elements.sku.addEventListener('input', () => {
+      form.elements.sku.dataset.autoGenerated = 'false';
+    });
+    form.elements.name.addEventListener('input', () => {
+      if (form.elements.sku.dataset.autoGenerated !== 'false') {
+        form.elements.sku.value = previewSku(form.elements.name.value);
+        form.elements.sku.dataset.autoGenerated = 'true';
+      }
+    });
+    productGroupSelect.addEventListener('change', () => {
+      updateProductGroupOptions();
+      const option = productGroupOptionSelect.selectedOptions[0];
+      if (option?.dataset.quantity !== undefined && !form.elements.id.value) form.elements.stock_quantity.value = option.dataset.quantity;
+      if (option?.dataset.sku && !form.elements.id.value) { form.elements.sku.value = option.dataset.sku; form.elements.sku.dataset.autoGenerated = 'false'; }
+    });
+    productGroupOptionSelect.addEventListener('change', () => {
+      const option = productGroupOptionSelect.selectedOptions[0];
+      if (option?.dataset.quantity !== undefined && !form.elements.id.value) form.elements.stock_quantity.value = option.dataset.quantity;
+      if (option?.dataset.sku && !form.elements.id.value) { form.elements.sku.value = option.dataset.sku; form.elements.sku.dataset.autoGenerated = 'false'; }
+    });
+    async function getToken() {
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        if (typeof window.getAdminIdToken === 'function') {
+          try {
+            const token = await window.getAdminIdToken();
+            if (token) return token;
+          } catch (error) {
+            if (error?.message && error.message !== 'No authenticated admin session.') throw error;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+      throw new Error('Authentication required. Please sign in again.');
+    }
+
+    async function apiFetch(url, options = {}) {
+      const token = await getToken();
+      const headers = new Headers(options.headers || {});
+      headers.set('Authorization', `Bearer ${token}`);
+      if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+      const response = await fetch(url, { ...options, headers });
+      const responseText = await response.text();
+      let payload = {};
+      try { payload = responseText ? JSON.parse(responseText) : {}; } catch {}
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || (responseText ? 'Request failed: ' + response.status : 'Request failed: ' + response.status));
+      }
+      return payload;
+    }
+
+    async function loadShippingTypes() {
+      const payload = await apiFetch('/api/shipping?include_disabled=1');
+      shippingTypes = Array.isArray(payload.shipping_types) ? payload.shipping_types : [];
+      shippingTypeSelect.innerHTML = '<option value="">No shipping type yet</option>';
+      for (const type of shippingTypes) {
+        const option = document.createElement('option');
+        option.value = type.id;
+        option.textContent = type.name + (Number(type.is_enabled) === 1 ? '' : ' (disabled)');
+        option.disabled = Number(type.is_enabled) !== 1;
+        option.dataset.requiresWeight = type.requires_weight;
+        option.dataset.requiresDimensions = type.requires_dimensions;
+        option.dataset.code = type.code || '';
+        shippingTypeSelect.append(option);
+      }
+      updateShippingFields();
+    }
+
+    function updateShippingFields() {
+      const type = shippingTypes.find((item) => String(item.id) === String(shippingTypeSelect.value));
+      const hasType = Boolean(type);
+      const requiresDimensions = hasType && Number(type.requires_dimensions) === 1;
+      const mode = shippingModeSelect.value;
+      shippingModeSelect.disabled = !hasType;
+      if (!hasType) {
+        shippingModeSelect.value = '';
+        shippingModeSelect.innerHTML = '<option value="">Select shipping type first</option><option value="compressible">Compressible / can be packed into a bag</option><option value="prepacked">Already packaged / boxed</option>';
+        shippingModeHelp.textContent = 'Use “already packaged” for products such as shoes or manufacturer-boxed goods.';
+      } else {
+        if (!Array.from(shippingModeSelect.options).some((option) => option.value === 'compressible')) shippingModeSelect.innerHTML = '<option value="">Select packaging state</option><option value="compressible">Compressible / can be packed into a bag</option><option value="prepacked">Already packaged / boxed</option>';
+        const appliance = String(type.code || '').toLowerCase() === 'appliance';
+        shippingModeSelect.value = mode || (appliance ? 'prepacked' : '');
+        if (appliance) {
+          shippingModeSelect.value = 'prepacked';
+          shippingModeSelect.disabled = true;
+          shippingModeHelp.textContent = 'Appliances are treated as already packaged in their manufacturer/final box.';
+        } else {
+          shippingModeSelect.disabled = false;
+          shippingModeHelp.textContent = 'Use “already packaged” for products such as shoes or manufacturer-boxed goods.';
+        }
+      }
+      const finalMode = shippingModeSelect.value;
+      const showDimensions = hasType && (requiresDimensions || finalMode === 'prepacked');
+      shippingDimensions.hidden = !hasType;
+      shippingDimensionsHelp.textContent = showDimensions
+        ? 'Enter the packed outside dimensions used for parcel calculation.'
+        : 'Dimensions are optional for compressible products and can be determined by the selected packaging.';
+      for (const input of [form.elements.shipping_length_cm, form.elements.shipping_width_cm, form.elements.shipping_height_cm]) input.required = showDimensions;
+      if (hasType) {
+        shippingHelp.textContent = requiresDimensions
+          ? 'This shipping type requires weight and packed dimensions.'
+          : 'Weight is required. Dimensions are only needed when the product is already packaged.';
+      } else shippingHelp.textContent = 'Select a shipping type for this product.';
+    }
+
+    shippingTypeSelect.addEventListener('change', updateShippingFields);
+    shippingModeSelect.addEventListener('change', updateShippingFields);
+
+    async function loadCategories() {
+      const response = await fetch('/api/categories', { headers: { Accept: 'application/json' }, cache: 'no-store' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.success) throw new Error(payload.error || 'Unable to load categories.');
+
+      const categories = Array.isArray(payload.data) ? payload.data : [];
+
+      window.__productCategories = categories;
+      categorySelect.innerHTML = '<option value="">Uncategorized</option>';
+    }
+
+    async function loadProductGroups() {
+      const payload = await apiFetch('/api/product-groups');
+      productGroups = Array.isArray(payload.data) ? payload.data : [];
+      productGroupSelect.innerHTML = '<option value="">No group</option>';
+      for (const group of productGroups) {
+        const option = document.createElement('option');
+        option.value = group.id;
+        option.textContent = group.name + ' (' + (group.relationship_type === 'size' ? 'Size' : 'Color') + ')';
+        productGroupSelect.append(option);
+      }
+      groupsList.innerHTML = '';
+      if (!productGroups.length) { groupsList.innerHTML = '<p class="muted">No product groups yet.</p>'; return; }
+      for (const group of productGroups) {
+        const panel = document.createElement('div');
+        panel.className = 'admin-panel';
+        const optionText = (group.options || []).map((item) => item.value + (item.sku ? ' · SKU ' + item.sku : '') + ' · Qty ' + item.quantity).join(' · ');
+        panel.innerHTML = '<div><h3><a href="./group.html?id=' + encodeURIComponent(group.id) + '">' + escapeHtml(group.name) + '</a></h3><p class="muted">' + escapeHtml(group.relationship_type === 'size' ? 'Size' : 'Color') + (group.category_name ? ' · ' + escapeHtml(group.category_name) : '') + '</p><p class="muted">' + escapeHtml(optionText || 'No options') + '</p></div><div><button class="button button-small button-outline" type="button" data-delete-group="' + group.id + '">Delete</button></div>';
+        groupsList.append(panel);
+      }
+      updateProductGroupOptions();
+    }
+
+    groupsList.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-delete-group]');
+      if (!button) return;
+      if (!confirm('Delete this product group? It must not be assigned to any products.')) return;
+      try { await apiFetch('/api/product-groups?id=' + encodeURIComponent(button.dataset.deleteGroup), { method:'DELETE' }); await loadProductGroups(); listStatus.textContent = 'Group deleted.'; }
+      catch (error) { listStatus.textContent = error.message; }
+    });
+
+    async function loadProducts() {
+      listStatus.textContent = 'Loading products…';
+      try {
+        const results = await Promise.all(['draft', 'active', 'archived'].map((status) => apiFetch(`/api/products?status=${status}&limit=100`)));
+        products = results.flatMap((result) => result.data?.products || []).sort((a, b) => Number(a.sort_order) - Number(b.sort_order) || Number(b.id) - Number(a.id));
+        renderProducts();
+        updateListStatus();
+      } catch (error) {
+        listStatus.textContent = error.message;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+    }
+
+    function getFilteredProducts() {
+      const query = productSearch.value.trim().toLowerCase();
+      if (activeProductFilter === 'categories' && !selectedCategoryId) return [];
+      if (activeProductFilter === 'groups' && !selectedGroupId) return [];
+
+      return products.filter((product) => {
+        const matchesSearch = !query
+          || String(product.name || '').toLowerCase().includes(query)
+          || String(product.sku || '').toLowerCase().includes(query);
+        const matchesCategory = activeProductFilter !== 'categories'
+          || (() => {
+            const productCategory = (window.__productCategories || []).find((category) => String(category.id) === String(product.category_id));
+            const selectedCategory = (window.__productCategories || []).find((category) => String(category.id) === String(selectedCategoryId));
+            return String(product.category_id || '') === String(selectedCategoryId)
+              || (selectedCategory && Number(selectedCategory.is_main_category) === 1 && productCategory && String(productCategory.parent_id || '') === String(selectedCategoryId));
+          })();
+        const matchesGroup = activeProductFilter !== 'groups'
+          || String(product.product_group_id || '') === String(selectedGroupId);
+        return matchesSearch && matchesCategory && matchesGroup;
+      });
+    }
+
+    function renderProductFilterPanel() {
+      if (activeProductFilter === 'all') {
+        productFilterPanel.hidden = true;
+        productFilterPanel.innerHTML = '';
+        return;
+      }
+
+      productFilterPanel.hidden = false;
+      productFilterPanel.innerHTML = '';
+
+      const heading = document.createElement('div');
+      heading.className = 'product-filter-panel-heading';
+      heading.innerHTML = activeProductFilter === 'categories'
+        ? '<strong>Categories</strong><span class="muted">Choose a category to filter the products below.</span>'
+        : '<strong>Groups</strong><span class="muted">Choose a product group to filter the products below.</span>';
+      productFilterPanel.append(heading);
+
+      const search = document.createElement('input');
+      search.type = 'search';
+      search.className = 'product-filter-search';
+      search.placeholder = activeProductFilter === 'categories' ? 'Search categories…' : 'Search groups…';
+      search.autocomplete = 'off';
+      search.setAttribute('aria-label', activeProductFilter === 'categories' ? 'Search categories' : 'Search groups');
+      productFilterPanel.append(search);
+
+      const items = document.createElement('div');
+      items.className = 'product-filter-options';
+      items.setAttribute('role', 'listbox');
+      items.setAttribute('aria-label', activeProductFilter === 'categories' ? 'Categories' : 'Product groups');
+      productFilterPanel.append(items);
+
+      const renderItems = () => {
+        items.innerHTML = '';
+        const query = search.value.trim().toLowerCase();
+        if (activeProductFilter === 'categories') {
+          const enabled = window.__productCategories || [];
+          const mainCategories = enabled
+            .filter((category) => Number(category.is_main_category) === 1)
+            .filter((category) => !query || String(category.name || '').toLowerCase().includes(query));
+          const childrenByMain = new Map(
+            mainCategories.map((main) => [Number(main.id), []])
+          );
+          for (const category of enabled.filter((item) => Number(item.is_main_category) !== 1)) {
+            const parent = Number(category.parent_id);
+            if (parent && childrenByMain.has(parent)) childrenByMain.get(parent).push(category);
+          }
+
+          for (const main of mainCategories) {
+            const children = childrenByMain.get(Number(main.id)) || [];
+            const wrapper = document.createElement('div');
+            wrapper.className = 'product-filter-category';
+            
+            const mainRow = document.createElement('div');
+            mainRow.className = 'product-filter-category-row';
+
+            const mainButton = document.createElement('button');
+            mainButton.type = 'button';
+            mainButton.className = 'product-filter-option product-filter-category-toggle' + (String(selectedCategoryId) === String(main.id) ? ' is-selected' : '');
+            mainButton.dataset.categoryToggle = main.id;
+            mainButton.setAttribute('aria-expanded', 'false');
+            mainButton.innerHTML =
+              '<span>' + escapeHtml(main.name) + '</span><span class="product-filter-category-chevron" aria-hidden="true">⌄</span>';
+            mainRow.append(mainButton);
+
+            const allButton = document.createElement('button');
+            allButton.type = 'button';
+            allButton.className = 'button button-small button-outline product-filter-category-all' + (String(selectedCategoryId) === String(main.id) ? ' is-selected' : '');
+            allButton.dataset.categoryAll = main.id;
+            allButton.textContent = 'All';
+            allButton.setAttribute('aria-label', 'Show all products in ' + main.name);
+            mainRow.append(allButton);
+            wrapper.append(mainRow);
+
+            const childrenContainer = document.createElement('div');
+            childrenContainer.className = 'product-filter-category-children';
+            childrenContainer.hidden = true;
+            childrenContainer.setAttribute('role', 'group');
+            childrenContainer.setAttribute('aria-label', main.name + ' subcategories');
+
+            for (const child of children) {
+              const childButton = document.createElement('button');
+              childButton.type = 'button';
+              childButton.className = 'product-filter-option is-child' + (String(selectedCategoryId) === String(child.id) ? ' is-selected' : '');
+              childButton.dataset.categoryId = child.id;
+              childButton.innerHTML = '<span>' + escapeHtml(child.name) + '</span><span aria-hidden="true">→</span>';
+              childrenContainer.append(childButton);
+            }
+
+            if (children.length) wrapper.append(childrenContainer);
+            items.append(wrapper);
+
+            if (children.some((child) => String(child.id) === String(selectedCategoryId))) {
+              childrenContainer.hidden = false;
+              mainButton.setAttribute('aria-expanded', 'true');
+            }
+          }
+
+          if (!items.children.length) items.innerHTML = '<p class="muted">No main categories available.</p>';
+        } else {
+          const filtered = productGroups.filter((group) => !query || String(group.name || '').toLowerCase().includes(query));
+          for (const group of filtered) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'product-filter-option' + (String(selectedGroupId) === String(group.id) ? ' is-selected' : '');
+            button.dataset.groupId = group.id;
+            button.innerHTML = '<span>' + escapeHtml(group.name) + '</span><span class="muted">' + (group.options?.length || 0) + ' option' + ((group.options?.length || 0) === 1 ? '' : 's') + ' →</span>';
+            items.append(button);
+          }
+          if (!items.children.length) items.innerHTML = '<p class="muted">No product groups available.</p>';
+        }
+      };
+
+      search.addEventListener('input', renderItems);
+      renderItems();
+    }
+
+    function setProductFilter(filter) {
+      activeProductFilter = filter;
+      if (filter === 'all') {
+        selectedCategoryId = '';
+        selectedGroupId = '';
+      } else if (filter === 'categories') {
+        selectedGroupId = '';
+      } else if (filter === 'groups') {
+        selectedCategoryId = '';
+      }
+      for (const tab of productFilterTabs) {
+        const selected = tab.dataset.productFilterTab === filter;
+        tab.classList.toggle('is-active', selected);
+        tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+      }
+      renderProductFilterPanel();
+      renderProducts();
+      updateListStatus();
+    }
+
+    function updateListStatus() {
+      const filteredProducts = getFilteredProducts();
+      if (!products.length) {
+        listStatus.textContent = 'No products yet. Add your first product above.';
+        return;
+      }
+      const filtersActive = productSearch.value.trim() || (activeProductFilter !== 'all' && (selectedCategoryId || selectedGroupId));
+      listStatus.textContent = filtersActive
+        ? filteredProducts.length + ' of ' + products.length + ' products shown.'
+        : products.length + ' product' + (products.length === 1 ? '' : 's') + ' loaded.';
+    }
+
+    function renderProducts() {
+      list.innerHTML = '';
+      const filteredProducts = getFilteredProducts();
+      if (!filteredProducts.length) {
+        const empty = document.createElement('p');
+        empty.className = 'muted';
+        empty.textContent = products.length ? 'No products match the current search or selected filter.' : '';
+        list.append(empty);
+        updateListStatus();
+        return;
+      }
+
+      for (const product of filteredProducts) {
+        const panel = document.createElement('section');
+        panel.className = 'admin-panel';
+        const imageCount = Array.isArray(product.images) ? product.images.length : 0;
+        panel.innerHTML = `
+          <div class="panel-icon">${escapeHtml(String(product.id).padStart(2, '0'))}</div>
+          <div>
+            <h2><a href="./product.html?id=${encodeURIComponent(product.id)}">${escapeHtml(product.name)}</a></h2>
+            <p class="muted">${escapeHtml(product.category_name || 'Uncategorized')} · ${escapeHtml(product.status)} · ${escapeHtml(product.currency)} ${Number(product.price).toFixed(2)}</p>
+            <p class="muted">${product.track_stock ? `Stock: ${escapeHtml(product.stock_quantity)}` : 'Stock tracking off'}${product.sku ? ` · SKU: ${escapeHtml(product.sku)}` : ''} · ${imageCount} picture${imageCount === 1 ? '' : 's'}</p>
+          </div>
+          <div>
+            <a class="button button-outline" href="./product.html?id=${encodeURIComponent(product.id)}">Edit</a>
+            <button class="button button-outline" type="button" data-delete="${product.id}">Delete</button>
+          </div>`;
+        list.append(panel);
+      }
+    }
+
+    function updateImageSelectionText() {
+      const files = Array.from(imageInput.files || []);
+      if (!files.length) {
+        imageSelection.textContent = existingImages.length ? `${existingImages.length} existing picture${existingImages.length === 1 ? '' : 's'} will be kept.` : 'No pictures selected.';
+        return;
+      }
+      const names = files.map((file) => file.name).join(', ');
+      imageSelection.textContent = `${files.length} new picture${files.length === 1 ? '' : 's'} selected: ${names}`;
+    }
+
+    async function uploadImage(file) {
+      const data = new FormData();
+      data.append('file', file, file.name);
+      const payload = await apiFetch('/api/upload-image', { method: 'POST', body: data });
+      return payload.data;
+    }
+
+    async function saveProductImages(productId, files) {
+      let images = [...existingImages];
+      for (let index = 0; index < files.length; index += 1) {
+        setFormStatus(`Uploading picture ${index + 1} of ${files.length}…`);
+        const uploaded = await uploadImage(files[index]);
+        images.push({
+          image_url: uploaded.image_url,
+          cloudinary_public_id: uploaded.cloudinary_public_id,
+          alt_text: form.elements.name.value.trim(),
+          sort_order: images.length,
+          is_primary: images.length === 0
+        });
+      }
+      if (files.length) {
+        await apiFetch(`/api/products?id=${encodeURIComponent(productId)}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: form.elements.name.value.trim(),
+            sku: form.elements.sku.value.trim(),
+            product_group_id: form.elements.product_group_id.value || null,
+            product_group_option_id: form.elements.product_group_option_id.value || null,
+            category_id: form.elements.category_id.value || null,
+            status: form.elements.status.value,
+            price: Number(form.elements.price.value || 0),
+            stock_quantity: Number(form.elements.stock_quantity.value || 0),
+            sort_order: Number(form.elements.sort_order.value || 0),
+            track_stock: form.elements.track_stock.checked,
+            description: form.elements.description.value.trim(),
+            images
+          })
+        });
+      }
+    }
+
+    function showForm() {
+      formPanel.hidden = false;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function hideForm() {
+      formPanel.hidden = true;
+    }
+
+    function resetForm() {
+      resetProductAttributes();
+      form.reset();
+      form.elements.id.value = '';
+      form.elements.sku.dataset.autoGenerated = 'true';
+      form.elements.sku.value = form.elements.name.value ? previewSku(form.elements.name.value) : '';
+      form.elements.price.value = '0';
+      form.elements.stock_quantity.value = '0';
+      form.elements.sort_order.value = '0';
+      form.elements.status.value = 'draft';
+      productGroupSelect.value = '';
+      updateProductGroupOptions();
+      shippingTypeSelect.value = '';
+      shippingModeSelect.value = '';
+      form.elements.shipping_weight_kg.value = '';
+      form.elements.shipping_length_cm.value = '';
+      form.elements.shipping_width_cm.value = '';
+      form.elements.shipping_height_cm.value = '';
+      updateShippingFields();
+      form.elements.track_stock.checked = true;
+      existingImages = [];
+      updateImageSelectionText();
+      document.querySelector('#product-form-title').textContent = 'Add product';
+      cancelButton.hidden = true;
+      saveButton.textContent = 'Save product';
+      setFormStatus('Ready to add a product.');
+    }
+
+    function editProduct(product) {
+      resetProductAttributes();
+      if (Array.isArray(product.attributes)) product.attributes.forEach((attribute) => addProductAttributeRow(attribute));
+      setProductFormMode(product.product_group_id ? 'group' : 'normal');
+      showForm();
+      form.elements.id.value = product.id;
+      form.elements.name.value = product.name || '';
+      form.elements.sku.value = product.sku || '';
+      form.elements.sku.dataset.autoGenerated = product.sku ? 'false' : 'true';
+      form.elements.product_group_id.value = product.product_group_id || '';
+      updateProductGroupOptions(product.product_group_option_id || '');
+      form.elements.category_id.value = product.category_id || '';
+      form.elements.status.value = product.status || 'draft';
+      form.elements.price.value = product.price ?? 0;
+      form.elements.stock_quantity.value = product.stock_quantity ?? 0;
+      form.elements.sort_order.value = product.sort_order ?? 0;
+      form.elements.track_stock.checked = Boolean(product.track_stock);
+      form.elements.description.value = product.description || '';
+      shippingTypeSelect.value = product.shipping_type_id || '';
+      updateShippingFields();
+      shippingModeSelect.value = product.shipping_packaging_mode || (String(shippingTypes.find((item) => String(item.id) === String(product.shipping_type_id))?.code || '').toLowerCase() === 'appliance' ? 'prepacked' : '');
+      form.elements.shipping_weight_kg.value = product.shipping_weight_kg ?? '';
+      form.elements.shipping_length_cm.value = product.shipping_length_cm ?? '';
+      form.elements.shipping_width_cm.value = product.shipping_width_cm ?? '';
+      form.elements.shipping_height_cm.value = product.shipping_height_cm ?? '';
+      updateShippingFields();
+      existingImages = Array.isArray(product.images) ? product.images.map((image, index) => ({ ...image, sort_order: index, is_primary: index === 0 })) : [];
+      imageInput.value = '';
+      updateImageSelectionText();
+      document.querySelector('#product-form-title').textContent = `Edit: ${product.name}`;
+      cancelButton.hidden = false;
+      saveButton.textContent = 'Update product';
+      setFormStatus('Editing this product.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    imageInput.addEventListener('change', updateImageSelectionText);
+    productSearch.addEventListener('input', renderProducts);
+    productFilterTabs.forEach((tab) => tab.addEventListener('click', () => setProductFilter(tab.dataset.productFilterTab)));
+    productFilterPanel.addEventListener('click', (event) => {
+      const categoryToggle = event.target.closest('[data-category-toggle]');
+      if (categoryToggle) {
+        const wrapper = categoryToggle.closest('.product-filter-category');
+        const children = wrapper?.querySelector('.product-filter-category-children');
+        if (children) {
+          const shouldExpand = children.hidden;
+          selectedCategoryId = '';
+          renderProductFilterPanel();
+          renderProducts();
+          updateListStatus();
+
+          const refreshedWrapper = Array.from(productFilterPanel.querySelectorAll('.product-filter-category')).find(
+            (item) => item.querySelector('[data-category-toggle]')?.dataset.categoryToggle === categoryToggle.dataset.categoryToggle
+          );
+          const refreshedToggle = refreshedWrapper?.querySelector('[data-category-toggle]');
+          const refreshedChildren = refreshedWrapper?.querySelector('.product-filter-category-children');
+          if (refreshedChildren) {
+            refreshedChildren.hidden = !shouldExpand;
+            refreshedToggle?.setAttribute('aria-expanded', shouldExpand ? 'true' : 'false');
+          }
+        }
+        return;
+      }
+
+      const allButton = event.target.closest('[data-category-all]');
+      if (allButton) {
+        const categoryId = allButton.dataset.categoryAll;
+        selectedCategoryId = String(selectedCategoryId) === String(categoryId) ? '' : categoryId;
+        renderProductFilterPanel();
+        renderProducts();
+        updateListStatus();
+        return;
+      }
+
+      const categoryButton = event.target.closest('[data-category-id]');
+      if (categoryButton) {
+        const categoryId = categoryButton.dataset.categoryId;
+        selectedCategoryId = String(selectedCategoryId) === String(categoryId) ? '' : categoryId;
+        renderProductFilterPanel();
+        renderProducts();
+        updateListStatus();
+        return;
+      }
+
+      const groupButton = event.target.closest('[data-group-id]');
+      if (groupButton) {
+        selectedGroupId = groupButton.dataset.groupId;
+        renderProductFilterPanel();
+        renderProducts();
+        updateListStatus();
+      }
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const id = form.elements.id.value;
+      const files = Array.from(imageInput.files || []);
+      const data = {
+        name: form.elements.name.value.trim(),
+        sku: form.elements.sku.dataset.autoGenerated === 'true' ? '' : form.elements.sku.value.trim(),
+        product_group_id: form.elements.product_group_id.value || null,
+        product_group_option_id: form.elements.product_group_option_id.value || null,
+        category_id: form.elements.category_id.value || null,
+        status: form.elements.status.value,
+        price: Number(form.elements.price.value || 0),
+        stock_quantity: Number(form.elements.stock_quantity.value || 0),
+        sort_order: Number(form.elements.sort_order.value || 0),
+        track_stock: form.elements.track_stock.checked,
+        description: form.elements.description.value.trim(),
+        shipping_type_id: form.elements.shipping_type_id.value || null,
+        shipping_packaging_mode: form.elements.shipping_packaging_mode.value || null,
+        shipping_weight_kg: form.elements.shipping_weight_kg.value === '' ? null : Number(form.elements.shipping_weight_kg.value),
+        shipping_length_cm: form.elements.shipping_length_cm.value === '' ? null : Number(form.elements.shipping_length_cm.value),
+        shipping_width_cm: form.elements.shipping_width_cm.value === '' ? null : Number(form.elements.shipping_width_cm.value),
+        shipping_height_cm: form.elements.shipping_height_cm.value === '' ? null : Number(form.elements.shipping_height_cm.value),
+        attributes: readProductAttributes()
+      };
+      if (!data.name) return setFormStatus('Product name is required.');
+      if (!confirm(id ? 'Update this product?' : 'Create this product?')) return;
+      saveButton.disabled = true;
+      setFormStatus(id ? 'Updating product…' : 'Creating product…');
+      try {
+        const saved = await apiFetch(id ? `/api/products?id=${encodeURIComponent(id)}` : '/api/products', { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) });
+        const productId = id || saved.data.id;
+        await saveProductImages(productId, files);
+        resetForm();
+        hideForm();
+        await loadProducts();
+      } catch (error) {
+        setFormStatus(error.message);
+      } finally {
+        saveButton.disabled = false;
+      }
+    });
+
+    cancelButton.addEventListener('click', () => {
+      resetForm();
+      setProductFormMode('normal');
+      hideForm();
+    });
+    document.querySelector('[data-refresh-products]').addEventListener('click', loadProducts);
+    list.addEventListener('click', async (event) => {
+      const editId = event.target.closest('[data-edit]')?.dataset.edit;
+      const deleteId = event.target.closest('[data-delete]')?.dataset.delete;
+      if (editId) {
+        const product = products.find((item) => String(item.id) === String(editId));
+        if (product) editProduct(product);
+        return;
+      }
+      if (deleteId) {
+        const product = products.find((item) => String(item.id) === String(deleteId));
+        if (!product || !confirm(`Delete “${product.name}”? This cannot be undone.`)) return;
+        try {
+          await apiFetch(`/api/products?id=${encodeURIComponent(deleteId)}`, { method: 'DELETE' });
+          if (String(form.elements.id.value) === String(deleteId)) {
+            resetForm();
+            hideForm();
+          }
+          await loadProducts();
+        } catch (error) {
+          listStatus.textContent = error.message;
+        }
+      }
+    });
+
+    async function init() {
+      const params = new URLSearchParams(location.search);
+      const groupId = params.get('group_id');
+      const addingProduct = params.get('add') === '1';
+
+      try {
+        await loadShippingTypes();
+      } catch (error) {
+        setFormStatus(error.message);
+      }
+
+      try {
+        await loadCategories();
+      } catch (error) {
+        setFormStatus(error.message);
+      }
+
+      try {
+        await loadProductGroups();
+      } catch (error) {
+        setFormStatus(error.message);
+      }
+
+      if (addingProduct) {
+        resetForm();
+        setProductFormMode(groupId ? 'group' : 'normal');
+        showForm();
+        if (groupId && productGroups.some((group) => String(group.id) === String(groupId))) {
+          productGroupSelect.value = groupId;
+          updateProductGroupOptions();
+          document.querySelector('#product-form-title').textContent = 'Add product to group';
+          setFormStatus('Adding a product to ' + (getSelectedGroup()?.name || 'this group') + '.');
+        }
+        form.elements.name.focus();
+        history.replaceState({}, '', './');
+      }
+
+      await loadProducts();
+    }
+    init();
+  </script>
+</body>
+</html>
