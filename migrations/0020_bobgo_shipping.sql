@@ -4,8 +4,6 @@
 
 PRAGMA defer_foreign_keys = ON;
 
-BEGIN TRANSACTION;
-
 CREATE TABLE shipping_methods_new (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -70,5 +68,3 @@ SELECT
 WHERE NOT EXISTS (
   SELECT 1 FROM shipping_methods WHERE provider_type = 'bobgo'
 );
-
-COMMIT;
