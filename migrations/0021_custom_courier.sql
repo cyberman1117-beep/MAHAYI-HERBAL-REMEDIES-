@@ -3,8 +3,6 @@
 
 PRAGMA defer_foreign_keys = ON;
 
-BEGIN TRANSACTION;
-
 CREATE TABLE shipping_methods_new (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -90,5 +88,3 @@ CREATE INDEX IF NOT EXISTS idx_custom_couriers_method
 
 CREATE INDEX IF NOT EXISTS idx_custom_courier_rates_lookup
   ON custom_courier_rates (custom_courier_id, is_enabled, sort_order, id);
-
-COMMIT;
