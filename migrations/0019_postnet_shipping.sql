@@ -5,8 +5,6 @@
 
 PRAGMA defer_foreign_keys = ON;
 
-BEGIN TRANSACTION;
-
 CREATE TABLE shipping_methods_new (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -107,5 +105,3 @@ WHERE NOT EXISTS (
   FROM shipping_methods
   WHERE provider_type = 'postnet'
 );
-
-COMMIT;
