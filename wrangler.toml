@@ -1,6 +1,6 @@
 compatibility_date = "2026-09-15"
 
-name = "clothing-store-api"
+name = "mahayi-herbal-remedies"
 main = "src/entry.js"
 
 [[d1_databases]]
