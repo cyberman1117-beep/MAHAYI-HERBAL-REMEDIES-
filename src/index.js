@@ -5,7 +5,7 @@ const JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
   "Cache-Control": "no-store"
 };
-const FIREBASE_PROJECT_ID = "clothing-store-e7200";
+const FIREBASE_PROJECT_ID = "mahayi-herbal-remedies";
 const FIREBASE_ISSUER = `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`;
 const FIREBASE_KEYS_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com";
 const firebaseKeyCache = new Map();
