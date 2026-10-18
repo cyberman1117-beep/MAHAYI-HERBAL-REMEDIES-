@@ -1,5 +1,5 @@
-# Clothing Store
+# Mahayi Herbal Remedies
 
-This repository is being prepared for a clothing-store web project.
+This repository contains the Mahayi Herbal Remedies website and its supporting Cloudflare Pages and Worker configuration.
 
-Cloudflare Pages deployment test.
+Cloudflare Pages deployment trigger check.
