@@ -1,9 +1,8 @@
 export const firebaseConfig = {
-  apiKey: "AIzaSyDQjotIJvYeEggt-zn5wlvRSoMcVcgPgaU",
-  authDomain: "clothing-store-e7200.firebaseapp.com",
-  projectId: "clothing-store-e7200",
-  storageBucket: "clothing-store-e7200.firebasestorage.app",
-  messagingSenderId: "631043708400",
-  appId: "1:631043708400:web:43b15745d1a4b7c41f7935",
-  measurementId: "G-XEZ10CHQHB"
+  apiKey: "AIzaSyA_3bbhxbT-6qIOl3_GYjj85k7MKf5eBmQ",
+  authDomain: "mahayi-herbal-remedies.firebaseapp.com",
+  projectId: "mahayi-herbal-remedies",
+  storageBucket: "mahayi-herbal-remedies.firebasestorage.app",
+  messagingSenderId: "934423585993",
+  appId: "1:934423585993:web:a09ba094d0885eefbd1918"
 };
