@@ -141,7 +141,7 @@ async function handleImageUpload(request, env) {
     if (!(file instanceof File)) return jsonResponse({ success: false, error: "An image file is required." }, 400);
     if (!file.type.startsWith("image/")) return jsonResponse({ success: false, error: "Only image files are allowed." }, 400);
     if (file.size > 10 * 1024 * 1024) return jsonResponse({ success: false, error: "Image is too large. Maximum size is 10 MB." }, 413);
-    const timestamp = Math.floor(Date.now() / 1000); const purpose = String((await request.clone().formData()).get("purpose") || "product").trim().toLowerCase(); const folder = purpose === "logo" ? "clothing-store/branding" : "clothing-store/products"; const signature = await createCloudinarySignature({ folder, timestamp }, env.CLOUDINARY_API_SECRET);
+    const timestamp = Math.floor(Date.now() / 1000); const purpose = String((await request.clone().formData()).get("purpose") || "product").trim().toLowerCase(); const folder = purpose === "logo" ? "mahayi-herbal-remedies/branding" : "mahayi-herbal-remedies/products"; const signature = await createCloudinarySignature({ folder, timestamp }, env.CLOUDINARY_API_SECRET);
     const cloudinaryForm = new FormData(); cloudinaryForm.append("file", file, file.name || "product-image"); cloudinaryForm.append("api_key", env.CLOUDINARY_API_KEY); cloudinaryForm.append("timestamp", String(timestamp)); cloudinaryForm.append("folder", folder); cloudinaryForm.append("signature", signature);
     const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(env.CLOUDINARY_CLOUD_NAME)}/image/upload`, { method: "POST", body: cloudinaryForm });
     const result = await response.json().catch(() => ({}));
