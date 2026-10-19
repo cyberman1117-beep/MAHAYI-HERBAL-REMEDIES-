@@ -88,11 +88,13 @@ async function getStoreSettings(env) {
   return { store: { ...store, additional_settings: { ...additionalSettings, email: emailSettings } }, social_links: socialLinks.results ?? [] };
 }
 async function handleStoreSettings(request, env) {
+  let adminAuthorized = false;
   if (request.method === "GET") { try { return jsonResponse({ success: true, data: await getStoreSettings(env) }); } catch { return jsonResponse({ success: false, error: "Unable to load store settings." }, 500); } }
   if (request.method !== "PUT") return jsonResponse({ success: false, error: "Method not allowed." }, 405);
   try {
     const token = await verifyFirebaseIdToken(request);
     await requireAdminRole(token, env);
+    adminAuthorized = true;
     const body = await request.json();
     const allowedFields = ["store_name", "logo_url", "tagline", "description", "contact_email", "contact_phone", "whatsapp_url", "address"];
     const values = allowedFields.map((field) => String(body?.[field] ?? "").trim());
@@ -120,9 +122,12 @@ async function handleStoreSettings(request, env) {
       else await env.DB.prepare(`INSERT INTO social_links (platform, label, url, sort_order, is_enabled) VALUES (?, ?, ?, ?, ?)`).bind(platform, label, url, sortOrder, enabled).run();
     }
     return jsonResponse({ success: true, data: { uid: token.sub } });
-  } catch (error) { if (error?.message === "Authentication required.") return jsonResponse({ success: false, error: error.message }, 401);
+  } catch (error) {
+    console.error("Store settings save failed:", error);
     if (error?.message === "Administrator authorization required.") return jsonResponse({ success: false, error: error.message }, 403);
-    return jsonResponse({ success: false, error: "Unable to save store settings." }, 500); }
+    if (!adminAuthorized) return jsonResponse({ success: false, error: "Authentication required." }, 401);
+    return jsonResponse({ success: false, error: "Unable to save store settings.", details: error?.message || "Unknown database or settings error." }, 500);
+  }
 }
 async function createCloudinarySignature(params, secret) {
   const entries = Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== "").sort(([a], [b]) => a.localeCompare(b));
