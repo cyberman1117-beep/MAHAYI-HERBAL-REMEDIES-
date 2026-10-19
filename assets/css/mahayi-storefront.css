@@ -1,25 +1,25 @@
 /* Mahayi Herbal Remedies — storefront visual identity only */
 :root {
-  --color-brand-primary: #173f2d;
-  --color-brand-primary-hover: #0f3021;
-  --color-brand-secondary: #8b6b35;
-  --color-brand-secondary-hover: #6f5228;
-  --color-brand-secondary-soft: #e9efe5;
-  --color-background: #f7f7f0;
-  --color-surface: #fffefa;
-  --color-surface-muted: #edf1e8;
-  --color-surface-strong: #dce5d8;
-  --color-text: #1c2e23;
-  --color-text-muted: #647166;
-  --color-text-subtle: #7f897f;
-  --color-text-inverse: #fffdf7;
-  --color-border: #dce3d8;
-  --color-border-strong: #aebcab;
-  --focus-ring: 0 0 0 3px rgb(139 107 53 / .28);
+  --color-brand-primary: #00452A;
+  --color-brand-primary-hover: #00351F;
+  --color-brand-secondary: #F2CF32;
+  --color-brand-secondary-hover: #C9A91E;
+  --color-brand-secondary-soft: #EAF4E5;
+  --color-background: #FFFFFF;
+  --color-surface: #FFFFFF;
+  --color-surface-muted: #F5F7F2;
+  --color-surface-strong: #D6E8CE;
+  --color-text: #151515;
+  --color-text-muted: #4F5D52;
+  --color-text-subtle: #687268;
+  --color-text-inverse: #FFFFFF;
+  --color-border: #D6E8CE;
+  --color-border-strong: #66B51E;
+  --focus-ring: 0 0 0 3px rgb(242 207 50 / .35);
 }
 body { background: var(--color-background); }
 .site-header {
-  border-bottom-color: rgb(23 63 45 / .12);
+  border-bottom-color: rgb(0 69 42 / .14);
   background: rgb(250 250 244 / .92);
 }
 .site-header .brand { color: var(--color-brand-primary); letter-spacing: .09em; }
@@ -30,103 +30,103 @@ body { background: var(--color-background); }
   min-height: 430px;
   padding: clamp(5rem, 10vw, 8.25rem) 0;
   background:
-    radial-gradient(ellipse at 88% 22%, rgb(180 199 151 / .2), transparent 24%),
-    radial-gradient(ellipse at 77% 88%, rgb(207 175 111 / .17), transparent 32%),
-    linear-gradient(118deg, #143a29 0%, #1e5038 58%, #284d35 100%);
+    radial-gradient(ellipse at 88% 22%, rgb(102 181 30 / .18), transparent 24%),
+    radial-gradient(ellipse at 77% 88%, rgb(242 207 50 / .14), transparent 32%),
+    linear-gradient(118deg, #003D25 0%, #005332 58%, #00452A 100%);
 }
 .hero::before, .hero::after {
   position: absolute;
   z-index: -1;
   content: "";
   pointer-events: none;
-  border: 1px solid rgb(239 242 219 / .16);
+  border: 1px solid rgb(102 181 30 / .3);
   border-radius: 50% 0 50% 0;
   transform: rotate(-34deg);
 }
 .hero::before { width: 210px; height: 330px; right: 8%; top: 7%; }
 .hero::after { width: 145px; height: 235px; right: 18%; top: 26%; transform: rotate(32deg); }
 .hero-copy { max-width: 720px; }
-.hero-copy .eyebrow, .cart-callout .eyebrow { color: #d6c18d; }
+.hero-copy .eyebrow, .cart-callout .eyebrow { color: #F2CF32; }
 .hero h1 { max-width: 700px; font-size: clamp(3rem, 7.4vw, 6rem); line-height: 1.02; letter-spacing: -.055em; }
-.hero-text { max-width: 560px; color: rgb(255 253 247 / .8); }
+.hero-text { max-width: 560px; color: rgb(255 255 255 / .86); }
 .button { min-height: 46px; }
 .button-primary {
-  background: #c2a568;
-  color: #172f22;
+  background: #F2CF32;
+  color: #151515;
   box-shadow: 0 10px 24px rgb(0 0 0 / .14);
 }
-.button-primary:hover { background: #d5bd87; color: #172f22; }
-.button-ghost { border-color: rgb(23 63 45 / .22); color: var(--color-brand-primary); }
-.button-ghost:hover { border-color: var(--color-brand-primary); background: var(--color-brand-primary); color: #fffdf7; }
+.button-primary:hover { background: #FFE36A; color: #151515; }
+.button-ghost { border-color: rgb(0 69 42 / .25); color: var(--color-brand-primary); }
+.button-ghost:hover { border-color: var(--color-brand-primary); background: var(--color-brand-primary); color: #FFFFFF; }
 .section { padding-block: clamp(3.5rem, 7vw, 6rem); }
 .section-heading {
   padding: clamp(1.2rem, 3vw, 2rem) clamp(1.25rem, 3vw, 2.25rem);
-  border-color: rgb(23 63 45 / .1);
+  border-color: rgb(0 69 42 / .12);
   border-radius: 1.1rem;
   background:
-    radial-gradient(circle at 96% 10%, rgb(139 107 53 / .12), transparent 30%),
-    linear-gradient(135deg, #fffefa 0%, #f0f3e9 100%);
-  box-shadow: 0 12px 30px rgb(23 63 45 / .045);
+    radial-gradient(circle at 96% 10%, rgb(242 207 50 / .18), transparent 30%),
+    linear-gradient(135deg, #FFFFFF 0%, #F1F7EB 100%);
+  box-shadow: 0 12px 30px rgb(0 69 42 / .06);
 }
-.section-heading::before { width: 4px; background: #8b6b35; }
-.section-heading::after { border-color: rgb(139 107 53 / .25); }
-.section-heading .eyebrow { color: #8b6b35; }
-.section-heading .button-ghost { border-color: #b7c4b3; color: var(--color-brand-primary); }
-.section-heading .button-ghost:hover { border-color: var(--color-brand-primary); background: var(--color-brand-primary); color: #fffdf7; }
+.section-heading::before { width: 4px; background: #F2CF32; }
+.section-heading::after { border-color: rgb(242 207 50 / .45); }
+.section-heading .eyebrow { color: #F2CF32; }
+.section-heading .button-ghost { border-color: #66B51E; color: var(--color-brand-primary); }
+.section-heading .button-ghost:hover { border-color: var(--color-brand-primary); background: var(--color-brand-primary); color: #FFFFFF; }
 .category-main-section {
-  border-color: rgb(23 63 45 / .1);
+  border-color: rgb(0 69 42 / .12);
   border-radius: 1.25rem;
-  background: #fffefa;
-  box-shadow: 0 10px 28px rgb(23 63 45 / .045);
+  background: #FFFFFF;
+  box-shadow: 0 10px 28px rgb(0 69 42 / .06);
 }
 .category-card {
-  border-color: #dce3d8;
+  border-color: #D6E8CE;
   border-radius: 1rem;
-  background: #fffefa;
+  background: #FFFFFF;
 }
-.category-card:hover { border-color: #8b6b35; }
-.category-card-large { background: linear-gradient(145deg, #173f2d, #2d5b40); color: #fffdf7; }
+.category-card:hover { border-color: #F2CF32; }
+.category-card-large { background: linear-gradient(145deg, #00452A, #006B3B); color: #FFFFFF; }
 .product-grid { gap: clamp(.85rem, 2vw, 1.5rem); }
 .product-card {
   padding: .55rem;
   border: 1px solid transparent;
   border-radius: 1rem;
-  background: #fffefa;
-  box-shadow: 0 5px 20px rgb(23 63 45 / .035);
+  background: #FFFFFF;
+  box-shadow: 0 5px 20px rgb(0 69 42 / .05);
   transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
 }
 .product-card:hover {
-  border-color: #dce3d8;
-  box-shadow: 0 16px 32px rgb(23 63 45 / .1);
+  border-color: #D6E8CE;
+  box-shadow: 0 16px 32px rgb(0 69 42 / .12);
 }
 .product-image {
   min-height: 300px;
   border-radius: .75rem;
-  background-color: #e8ede2;
+  background-color: #EAF4E5;
   box-shadow: none;
 }
 .product-image:hover { box-shadow: none; }
 .product-info { padding: 1rem .45rem .5rem; }
-.product-category { color: #71806e; letter-spacing: .08em; }
-.product-info h3 { color: #213c2b; line-height: 1.35; }
-.price, .product-detail-price { color: #725426; }
+.product-category { color: #52664F; letter-spacing: .08em; }
+.product-info h3 { color: #00452A; line-height: 1.35; }
+.price, .product-detail-price { color: #7B5D00; }
 .subcategory-showcase-card { flex-basis: 124px; }
 .subcategory-showcase-image {
   width: 124px; height: 124px;
-  border-color: #dce3d8;
-  box-shadow: 0 8px 22px rgb(23 63 45 / .07);
+  border-color: #D6E8CE;
+  box-shadow: 0 8px 22px rgb(0 69 42 / .08);
 }
-.subcategory-showcase-image::after { border-color: rgb(255 255 255 / .75); }
+.subcategory-showcase-image::after { border-color: rgb(255 255 255 / .9); }
 .catalogue-status { color: var(--color-text-muted); }
 .product-detail-layout { gap: clamp(2rem, 5vw, 4.5rem); }
-.product-gallery-main, .product-gallery-thumbs button { border-color: #dce3d8; border-radius: 1rem; }
+.product-gallery-main, .product-gallery-thumbs button { border-color: #D6E8CE; border-radius: 1rem; }
 .product-detail-copy h1 { color: var(--color-brand-primary); }
 .site-footer {
-  border-top-color: #dce3d8;
-  background: #edf1e8;
+  border-top-color: #D6E8CE;
+  background: #F5F7F2;
 }
 .footer-column h3 { color: var(--color-brand-primary); }
-.footer-bottom { border-top-color: rgb(23 63 45 / .12); }
+.footer-bottom { border-top-color: rgb(0 69 42 / .14); }
 @media (max-width: 900px) {
   .hero { min-height: 380px; }
   .hero::before { right: 2%; opacity: .65; }
