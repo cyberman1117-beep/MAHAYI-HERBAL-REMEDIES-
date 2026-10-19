@@ -306,10 +306,18 @@ if (settingsForm) {
         body: JSON.stringify(collectSettings())
       });
       const payload = await response.json();
-      if (!response.ok || !payload?.success) throw new Error(payload?.error || 'Save failed');
+      if (!response.ok || !payload?.success) { const error = new Error(payload?.error || 'Save failed'); error.details = payload?.details || ''; throw error; }
       setSettingsStatus('Settings saved successfully.');
     } catch (error) {
-      setSettingsStatus(error?.message === 'Authentication required.' ? 'Your admin session has expired. Please sign in again.' : 'Unable to save settings. Please try again.');
+      if (error?.message === 'Authentication required.' || error?.message === 'Missing bearer token.' || error?.message === 'Token expired.') {
+        setSettingsStatus('Your admin session has expired. Please sign in again.');
+      } else if (error?.message === 'Administrator authorization required.') {
+        setSettingsStatus('This account is not authorized to save store settings.');
+      } else if (error?.details) {
+        setSettingsStatus(`Unable to save settings: ${error.details}`);
+      } else {
+        setSettingsStatus(error?.message && error.message !== 'Unable to save store settings.' ? `Unable to save settings: ${error.message}` : 'Unable to save settings. Please try again.');
+      }
     } finally {
       if (saveButton) saveButton.disabled = false;
     }
