@@ -286,6 +286,7 @@ if (settingsForm) {
     try {
       const idToken = await window.getAdminIdToken();
       const logoFile = logoFileInput?.files?.[0];
+      let logoUploadWarning = '';
       if (logoFile) {
         setSettingsStatus('Uploading store logo…');
         const uploadForm = new FormData();
@@ -293,8 +294,15 @@ if (settingsForm) {
         uploadForm.append('purpose', 'logo');
         const uploadResponse = await fetch('/api/upload-image', { method: 'POST', headers: { Authorization: `Bearer ${idToken}`, Accept: 'application/json' }, body: uploadForm });
         const uploadPayload = await uploadResponse.json().catch(() => ({}));
-        if (!uploadResponse.ok || !uploadPayload?.success) throw new Error(uploadPayload?.error || 'Logo upload failed');
-        if (logoUrlField) logoUrlField.value = uploadPayload.data.image_url;
+        if (!uploadResponse.ok || !uploadPayload?.success) {
+          if (uploadPayload?.error === 'Cloudinary upload is not configured.') {
+            logoUploadWarning = ' Your logo was not uploaded because Cloudinary is not configured.';
+          } else {
+            throw new Error(uploadPayload?.error || 'Logo upload failed');
+          }
+        } else if (logoUrlField) {
+          logoUrlField.value = uploadPayload.data.image_url;
+        }
       }
       const response = await fetch('/api/store-settings', {
         method: 'PUT',
@@ -307,7 +315,7 @@ if (settingsForm) {
       });
       const payload = await response.json();
       if (!response.ok || !payload?.success) { const error = new Error(payload?.error || 'Save failed'); error.details = payload?.details || ''; throw error; }
-      setSettingsStatus('Settings saved successfully.');
+      setSettingsStatus(logoUploadWarning ? `Settings saved successfully.${logoUploadWarning}` : 'Settings saved successfully.');
     } catch (error) {
       if (error?.message === 'Authentication required.' || error?.message === 'Missing bearer token.' || error?.message === 'Token expired.') {
         setSettingsStatus('Your admin session has expired. Please sign in again.');
