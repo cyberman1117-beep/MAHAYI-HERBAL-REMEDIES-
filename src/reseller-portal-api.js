@@ -114,7 +114,6 @@ export async function handleResellerPortal(request, env) {
         return json({ success: true, data: { orders: orders.results || [], items: items.results || [] } });
       }
       if (request.method !== "POST") return json({ success: false, error: "Method not allowed." }, 405);
-      if (reseller.pay_later_enabled) return json({ success: false, error: "Your account has distributor privileges. Contact M.H.R. for the agreed stock-issue process." }, 403);
       const body = await request.json();
       if (!Array.isArray(body.items) || !body.items.length || body.items.length > 50) return json({ success: false, error: "Add at least one product to your stock order." }, 400);
       const quantities = new Map();
