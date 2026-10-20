@@ -52,7 +52,7 @@ async function stockOrders(request, env, id) {
   if (request.method === "GET") {
     const result = await env.DB.prepare(`
       SELECT o.id, o.order_number, o.reseller_id, r.full_name AS reseller_name, r.email AS reseller_email,
-             o.currency, o.total_amount, o.payment_status, o.order_status, o.payment_reference,
+             o.currency, o.total_amount, o.payment_status, o.order_status, o.fulfilment_mode, o.payment_reference,
              o.reseller_notes, o.company_notes, o.stock_reserved_at, o.stock_released_at, o.inventory_applied_at, o.created_at, o.updated_at,
              (SELECT COUNT(*) FROM reseller_stock_order_items i WHERE i.reseller_stock_order_id = o.id) AS item_count
       FROM reseller_stock_orders o JOIN resellers r ON r.id = o.reseller_id
@@ -74,7 +74,16 @@ async function stockOrders(request, env, id) {
   if (!["pending", "paid", "failed", "cancelled", "refunded"].includes(paymentStatus)) return json({ success: false, error: "Invalid payment status." }, 400);
   if (!["submitted", "confirmed", "processing", "ready", "fulfilled", "cancelled"].includes(orderStatus)) return json({ success: false, error: "Invalid order status." }, 400);
   if (existing.inventory_applied_at && orderStatus !== "fulfilled") return json({ success: false, error: "This order has already added stock to reseller inventory. Use a return or adjustment instead of changing its fulfilment status." }, 409);
-  if (orderStatus === "fulfilled" && paymentStatus !== "paid") return json({ success: false, error: "Mark the order paid before releasing stock into reseller inventory." }, 400);
+  let creditIssue = false;
+  if (orderStatus === "fulfilled") {
+    if (existing.fulfilment_mode === "pay_later" && paymentStatus !== "paid") {
+      const reseller = await env.DB.prepare("SELECT status, pay_later_enabled FROM resellers WHERE id = ?").bind(existing.reseller_id).first();
+      if (!reseller || reseller.status !== "active" || Number(reseller.pay_later_enabled) !== 1) return json({ success: false, error: "Pay-later access is not currently approved for this reseller." }, 403);
+      creditIssue = true;
+    } else if (paymentStatus !== "paid") {
+      return json({ success: false, error: "Mark the order paid before releasing stock into reseller inventory." }, 400);
+    }
+  }
   if (existing.stock_released_at && orderStatus === "fulfilled") return json({ success: false, error: "This order was cancelled and its company stock reservation was released. Create a new order instead." }, 409);
   const reference = body.payment_reference === undefined ? existing.payment_reference : clean(body.payment_reference, 200);
   const notes = body.company_notes === undefined ? existing.company_notes : clean(body.company_notes, 4000);
@@ -99,18 +108,21 @@ async function stockOrders(request, env, id) {
     if (!items.results?.length) return json({ success: false, error: "Cannot fulfil an empty stock order." }, 409);
     for (const item of items.results) {
       if (!item.reseller_product_id) return json({ success: false, error: "A product in this order no longer exists. Inventory was not changed." }, 409);
+      const creditQuantity = creditIssue ? item.quantity : 0;
+      const movementType = creditIssue ? "pay_later_issue" : "stock_purchase";
       statements.push(env.DB.prepare(`
-        INSERT INTO reseller_inventory (reseller_id, reseller_product_id, quantity_available)
-        VALUES (?, ?, ?)
+        INSERT INTO reseller_inventory (reseller_id, reseller_product_id, quantity_available, pay_later_quantity)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT(reseller_id, reseller_product_id) DO UPDATE SET
           quantity_available = reseller_inventory.quantity_available + excluded.quantity_available,
+          pay_later_quantity = reseller_inventory.pay_later_quantity + excluded.pay_later_quantity,
           updated_at = CURRENT_TIMESTAMP
-      `).bind(existing.reseller_id, item.reseller_product_id, item.quantity));
+      `).bind(existing.reseller_id, item.reseller_product_id, item.quantity, creditQuantity));
       statements.push(env.DB.prepare(`
         INSERT INTO reseller_inventory_movements
           (reseller_id, reseller_product_id, movement_type, quantity_change, reference_type, reference_id, notes)
-        VALUES (?, ?, 'stock_purchase', ?, 'stock_order', ?, ?)
-      `).bind(existing.reseller_id, item.reseller_product_id, item.quantity, id, "Stock order " + existing.order_number + " — " + item.product_name));
+        VALUES (?, ?, ?, ?, 'stock_order', ?, ?)
+      `).bind(existing.reseller_id, item.reseller_product_id, movementType, item.quantity, id, "Stock order " + existing.order_number + " — " + item.product_name));
     }
     statements.push(env.DB.prepare(`
       UPDATE reseller_stock_orders SET payment_status = ?, order_status = ?, payment_reference = ?,
@@ -138,6 +150,42 @@ export async function handleAdminResellerManagement(request, env) {
     const id = idValue(url.searchParams.get("id"));
     if (resource === "accounts") return await accounts(request, env, id);
     if (resource === "stock-orders") return await stockOrders(request, env, id);
+    if (resource === "settlements") {
+      if (request.method === "GET") {
+        const accounts = await env.DB.prepare(`
+          SELECT r.id, r.full_name, r.email, r.status, r.pay_later_enabled,
+                 COALESCE(SUM(l.amount_debit), 0) - COALESCE(SUM(l.amount_credit), 0) AS outstanding
+          FROM resellers r LEFT JOIN reseller_company_ledger l ON l.reseller_id = r.id
+          GROUP BY r.id ORDER BY r.full_name, r.email
+        `).all();
+        const entries = await env.DB.prepare(`
+          SELECT l.id, l.reseller_id, r.full_name AS reseller_name, r.email AS reseller_email,
+                 l.movement_type, l.amount_debit, l.amount_credit, l.payment_reference, l.notes, l.created_at
+          FROM reseller_company_ledger l JOIN resellers r ON r.id = l.reseller_id
+          ORDER BY l.created_at DESC, l.id DESC LIMIT 500
+        `).all();
+        return json({ success: true, data: { accounts: accounts.results || [], entries: entries.results || [] } });
+      }
+      if (request.method !== "POST") return json({ success: false, error: "Use POST to record a settlement." }, 405);
+      const body = await request.json();
+      const resellerId = idValue(body.reseller_id);
+      const amount = Number(body.amount);
+      if (!resellerId || !Number.isFinite(amount) || amount <= 0) return json({ success: false, error: "Choose a reseller and enter a settlement amount greater than zero." }, 400);
+      const reseller = await env.DB.prepare("SELECT id, status, pay_later_enabled FROM resellers WHERE id = ?").bind(resellerId).first();
+      if (!reseller) return json({ success: false, error: "Reseller account not found." }, 404);
+      const balance = await env.DB.prepare("SELECT COALESCE(SUM(amount_debit) - SUM(amount_credit), 0) AS outstanding FROM reseller_company_ledger WHERE reseller_id = ?").bind(resellerId).first();
+      const outstanding = Math.round(Number(balance?.outstanding || 0) * 100) / 100;
+      const roundedAmount = Math.round(amount * 100) / 100;
+      if (roundedAmount > outstanding + 0.001) return json({ success: false, error: "Settlement exceeds the outstanding balance of R" + outstanding.toFixed(2) + "." }, 400);
+      const reference = clean(body.payment_reference, 200);
+      if (!reference) return json({ success: false, error: "Enter the payment reference before recording the settlement." }, 400);
+      await env.DB.prepare(`
+        INSERT INTO reseller_company_ledger
+          (reseller_id, movement_type, amount_credit, reference_type, payment_reference, notes)
+        VALUES (?, 'settlement', ?, 'manual_settlement', ?, ?)
+      `).bind(resellerId, roundedAmount, reference, clean(body.notes, 4000)).run();
+      return json({ success: true, data: { reseller_id: resellerId, amount: roundedAmount, outstanding: Math.round((outstanding - roundedAmount) * 100) / 100 } }, 201);
+    }
     if (resource === "sales" && request.method === "GET") {
       const sales = await env.DB.prepare(`
         SELECT o.id, o.order_number, o.reseller_id, r.full_name AS reseller_name, r.email AS reseller_email,
