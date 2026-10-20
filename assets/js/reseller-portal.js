@@ -86,6 +86,20 @@ function findPackage(packageId) {
 }
 function renderProducts(data) {
   products = data;
+  const requestedPackage = new URL(location.href).searchParams.get("order_package");
+  const requestedQuantity = Number(new URL(location.href).searchParams.get("quantity") || 1);
+  if (requestedPackage) {
+    const requested = findPackage(requestedPackage);
+    if (requested && Number.isSafeInteger(requestedQuantity) && requestedQuantity >= Number(requested.pkg.minimum_order_quantity || 1)
+      && requestedQuantity <= Number(requested.pkg.stock_quantity)) {
+      cart.set(Number(requested.pkg.package_id || requested.pkg.id), requestedQuantity);
+      const cleanUrl = new URL(location.href); cleanUrl.searchParams.delete("order_package"); cleanUrl.searchParams.delete("quantity"); history.replaceState({}, "", cleanUrl);
+      $("#cart-status").textContent = requested.product.name + " (" + requested.pkg.package_label + ") is ready in your stock order. Review the total below, then place your order.";
+      setTimeout(() => $("#stock-cart").scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    } else {
+      $("#cart-status").textContent = "That package selection could not be added. Please check stock and quantity, then try again.";
+    }
+  }
   const list = $("#product-list");
   list.replaceChildren();
   const available = products.filter((p) => (p.packages || []).some((pkg) => Number(pkg.is_enabled) === 1));
