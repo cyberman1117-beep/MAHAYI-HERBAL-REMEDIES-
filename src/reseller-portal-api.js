@@ -75,7 +75,7 @@ export async function handleResellerPortal(request, env) {
       if (reseller.status !== "active") return json({ success: false, error: "Your reseller account must be approved before you can view the reseller catalogue." }, 403);
       const result = await env.DB.prepare(`
         SELECT p.id, p.category_id, c.name AS category_name, p.name, p.slug, p.description, p.sku, p.currency,
-               p.stock_quantity, p.track_stock, pp.customer_price, pp.reseller_share, pp.minimum_order_quantity
+               p.stock_quantity, p.track_stock, pp.customer_price, pp.reseller_share, pp.company_share AS stock_unit_price, pp.minimum_order_quantity
         FROM reseller_products p
         INNER JOIN reseller_product_pricing pp ON pp.reseller_product_id = p.id AND pp.is_enabled = 1
         LEFT JOIN reseller_categories c ON c.id = p.category_id
