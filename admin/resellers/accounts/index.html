@@ -8,7 +8,7 @@
 <div class="settings-heading"><div><h2>Find a reseller</h2><p class="muted">Applications waiting for approval are kept separate from active accounts.</p></div><button class="button button-outline" id="refresh" type="button">Refresh</button></div>
 <div class="settings-fields settings-fields-two">
 <label class="field"><span>Search by name, email or phone</span><input id="account-search" type="search" placeholder="Start typing a name, email or phone number"></label>
-<label class="field"><span>Account group</span><select id="account-status-filter"><option value="pending">Pending applications</option><option value="active">Approved / active</option><option value="suspended">Suspended</option><option value="rejected">Rejected</option><option value="all">All accounts</option></select></label>
+<label class="field"><span>Account group</span><select id="account-status-filter"><option value="all" selected>All accounts (grouped by status)</option><option value="pending">Pending applications</option><option value="active">Approved / active</option><option value="suspended">Suspended</option><option value="rejected">Rejected</option></select></label>
 </div>
 <p id="list-status" class="settings-load-status" role="status">Loading reseller accounts…</p>
 <div class="settings-fields settings-fields-two" style="align-items:start">
@@ -26,19 +26,27 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function labelStatus(s){return ({pending:'Pending approval',active:'Approved / active',suspended:'Suspended',rejected:'Rejected'})[s]||s||'Unknown';}
 function renderList(){
  const q=search.value.trim().toLowerCase(),group=filter.value;
- const visible=accounts.filter(a=>(group==='all'||a.status===group)&&[a.full_name,a.email,a.phone].some(v=>String(v||'').toLowerCase().includes(q)));
+ const matching=accounts.filter(a=>[a.full_name,a.email,a.phone].some(v=>String(v||'').toLowerCase().includes(q)));
+ const visible=matching.filter(a=>group==='all'||a.status===group);
  const counts={pending:0,active:0,suspended:0,rejected:0};for(const a of accounts)if(counts[a.status]!==undefined)counts[a.status]++;
- heading.textContent=({pending:'Pending applications',active:'Approved / active resellers',suspended:'Suspended accounts',rejected:'Rejected applications',all:'All reseller accounts'})[group]||'Reseller accounts';
- status.textContent=visible.length+' of '+accounts.length+' account(s) · Pending: '+counts.pending+' · Active: '+counts.active+' · Suspended: '+counts.suspended+' · Rejected: '+counts.rejected;
+ heading.textContent=({pending:'Pending applications',active:'Approved / active resellers',suspended:'Suspended accounts',rejected:'Rejected applications',all:'Reseller accounts — grouped by status'})[group]||'Reseller accounts';
+ status.textContent=visible.length+' matching account(s) shown · '+accounts.length+' total · Pending: '+counts.pending+' · Active: '+counts.active+' · Suspended: '+counts.suspended+' · Rejected: '+counts.rejected;
  list.replaceChildren();
- if(!visible.length){const empty=document.createElement('section');empty.className='settings-panel';empty.textContent=q?'No accounts match your search in this group.':'There are no accounts in this group.';list.append(empty);return;}
- for(const a of visible){
-  const b=document.createElement('button');b.type='button';b.className='admin-panel';b.style.width='100%';b.style.textAlign='left';b.style.cursor='pointer';b.setAttribute('aria-pressed',String(Number(selectedId)===Number(a.id)));
-  if(Number(selectedId)===Number(a.id))b.style.border='2px solid var(--color-primary, #8b6b25)';
-  const initials=String(a.full_name||a.email||'R').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase();
-  b.innerHTML='<div class="panel-icon">'+esc(initials)+'</div><div style="min-width:0"><h3>'+esc(a.full_name||'Unnamed applicant')+'</h3><p class="muted">'+esc(a.email||'No email')+'</p><p class="muted">'+esc(a.phone||'No phone')+'</p></div><span class="admin-status">'+esc(labelStatus(a.status))+'</span>';
-  b.addEventListener('click',()=>{selectedId=a.id;renderList();renderDetail(a);});
-  list.append(b);
+ if(!visible.length){const empty=document.createElement('section');empty.className='settings-panel';empty.textContent=q?'No accounts match your search.':'No accounts found for this status. If you expected existing accounts, use Refresh and check the loading message above.';list.append(empty);return;}
+ const order=group==='all'?['pending','active','suspended','rejected']:[group];
+ const names={pending:'Pending applications',active:'Approved / active resellers',suspended:'Suspended accounts',rejected:'Rejected applications'};
+ for(const state of order){
+  const rows=visible.filter(a=>a.status===state);
+  if(!rows.length)continue;
+  if(group==='all'){const h=document.createElement('h3');h.textContent=names[state]+' ('+rows.length+')';h.style.margin='1rem 0 .5rem';list.append(h);}
+  for(const a of rows){
+   const b=document.createElement('button');b.type='button';b.className='admin-panel';b.style.width='100%';b.style.textAlign='left';b.style.cursor='pointer';b.setAttribute('aria-pressed',String(Number(selectedId)===Number(a.id)));
+   if(Number(selectedId)===Number(a.id))b.style.border='2px solid var(--color-primary, #8b6b25)';
+   const initials=String(a.full_name||a.email||'R').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase();
+   b.innerHTML='<div class="panel-icon">'+esc(initials)+'</div><div style="min-width:0"><h3>'+esc(a.full_name||'Unnamed applicant')+'</h3><p class="muted">'+esc(a.email||'No email')+'</p><p class="muted">'+esc(a.phone||'No phone')+'</p></div><span class="admin-status">'+esc(labelStatus(a.status))+'</span>';
+   b.addEventListener('click',()=>{selectedId=a.id;renderList();renderDetail(a);});
+   list.append(b);
+  }
  }
 }
 function renderDetail(a){
