@@ -131,7 +131,9 @@ export async function handleResellerPortal(request, env) {
           SELECT p.id, p.name, p.sku, p.currency, p.stock_quantity, p.track_stock,
                  pp.customer_price, pp.reseller_share, pp.company_share, pp.minimum_order_quantity
           FROM reseller_products p JOIN reseller_product_pricing pp ON pp.reseller_product_id = p.id
+          LEFT JOIN reseller_categories c ON c.id = p.category_id
           WHERE p.id = ? AND p.status = 'active' AND pp.is_enabled = 1
+            AND (p.category_id IS NULL OR c.is_enabled = 1)
         `).bind(productId).first();
         if (!product) return json({ success: false, error: "One of the selected products is no longer available." }, 400);
         if (quantity < Number(product.minimum_order_quantity)) return json({ success: false, error: product.name + " requires a minimum order of " + product.minimum_order_quantity + "." }, 400);
