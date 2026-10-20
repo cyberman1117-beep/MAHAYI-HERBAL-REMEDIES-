@@ -18,6 +18,7 @@ let mode = "login";
 let currentUser = null;
 let products = [];
 const cart = new Map();
+const saleCart = new Map();
 
 function showPanel(selector) { panels.forEach((panel) => { $(panel).hidden = panel !== selector; }); }
 function setMode(nextMode) {
@@ -107,12 +108,20 @@ function renderProducts(data) {
     add.addEventListener("click", () => {
       const quantity = Number(qty.value);
       if (!Number.isSafeInteger(quantity) || quantity < Number(product.minimum_order_quantity || 1)) { $("#cart-status").textContent = "Enter a whole-number quantity that meets the minimum order."; return; }
-      if (Number(product.track_stock) === 1 && quantity > Number(product.stock_quantity)) { $("#cart-status").textContent = "That quantity is not currently available."; return; }
+      if (Number(product.track_stock) === 1 && quantity + (cart.get(Number(product.id)) || 0) > Number(product.stock_quantity)) { $("#cart-status").textContent = "That total quantity is not currently available."; return; }
       cart.set(Number(product.id), (cart.get(Number(product.id)) || 0) + quantity);
       renderCart();
-      $("#cart-status").textContent = product.name + " added to your order.";
+      $("#cart-status").textContent = product.name + " added to your stock order.";
     });
-    controls.append(qty, add);
+    const addSale = document.createElement("button"); addSale.className = "button button-outline"; addSale.type = "button"; addSale.textContent = "Add to sale";
+    addSale.addEventListener("click", () => {
+      const quantity = Number(qty.value);
+      if (!Number.isSafeInteger(quantity) || quantity < Number(product.minimum_order_quantity || 1)) { $("#sale-cart-status").textContent = "Enter a whole-number quantity that meets the minimum order."; return; }
+      saleCart.set(Number(product.id), (saleCart.get(Number(product.id)) || 0) + quantity);
+      renderSaleCart();
+      $("#sale-cart-status").textContent = product.name + " added to the customer sale.";
+    });
+    controls.append(qty, add, addSale);
     card.append(marker, details, controls);
     list.append(card);
   }
@@ -139,6 +148,39 @@ function renderCart() {
   $("#cart-total").textContent = "Total to pay M.H.R.: " + money(total);
   $("#place-order").disabled = !chosen.length;
   return chosen;
+}
+function renderSaleCart() {
+  const box = $("#sale-cart-items"); box.replaceChildren();
+  let total = 0; const chosen = [];
+  for (const [id, quantity] of saleCart) {
+    const p = products.find(item => Number(item.id) === id);
+    if (!p) continue;
+    total += Number(p.customer_price || 0) * quantity;
+    chosen.push({ product_id: id, quantity });
+    const row = document.createElement("div"); row.className = "admin-panel";
+    const details = document.createElement("div");
+    const title = document.createElement("h3"); title.textContent = p.name;
+    const amount = document.createElement("p"); amount.className = "muted"; amount.textContent = quantity + " × " + money(p.customer_price, p.currency) + " = " + money(Number(p.customer_price) * quantity, p.currency);
+    details.append(title, amount);
+    const remove = document.createElement("button"); remove.className = "button button-outline"; remove.type = "button"; remove.textContent = "Remove"; remove.addEventListener("click", () => { saleCart.delete(id); renderSaleCart(); });
+    row.append(details, remove); box.append(row);
+  }
+  if (!chosen.length) { const p = document.createElement("p"); p.className = "muted"; p.textContent = "No products selected for a sale."; box.append(p); }
+  $("#sale-cart-total").textContent = "Customer sale total: " + money(total);
+  $("#record-sale").disabled = !chosen.length;
+  return chosen;
+}
+async function loadSales() {
+  try {
+    const result = await api("sales");
+    const sales = result.data?.sales || [], items = result.data?.items || [];
+    const list = $("#my-sales-list"); list.replaceChildren();
+    $("#sales-status").textContent = sales.length ? sales.length + " customer sale(s)." : "You have not recorded a customer sale yet.";
+    for (const sale of sales) {
+      const lines = items.filter(item => Number(item.reseller_order_id) === Number(sale.id));
+      list.append(makeCard(sale.order_number, ["Customer: " + (sale.customer_full_name || "Not provided"), "Customer total: " + money(sale.subtotal, sale.currency), "Your share: " + money(sale.reseller_earnings, sale.currency), "Customer payment: " + sale.payment_status, "Date: " + sale.created_at, ...lines.map(item => item.product_name + " × " + item.quantity)]));
+    }
+  } catch (e) { $("#sales-status").textContent = e.message; }
 }
 async function loadInventoryAndOrders() {
   try {
@@ -192,7 +234,9 @@ async function loadAccount() {
     const productData = await api("products");
     renderProducts(productData.data?.products || []);
     renderCart();
+    renderSaleCart();
     await loadInventoryAndOrders();
+    await loadSales();
   } catch (error) {
     showPanel("#auth-panel");
     setMode("login");
@@ -223,6 +267,18 @@ form.addEventListener("submit", async (event) => {
 switchMode.addEventListener("click", () => setMode(mode === "register" ? "login" : "register"));
 $("[data-logout]").addEventListener("click", async () => { await signOut(auth); setMode("login"); });
 document.querySelectorAll("[data-refresh]").forEach((button) => button.addEventListener("click", loadAccount));
+$("#refresh-sales").addEventListener("click", loadSales);
+$("#record-sale").addEventListener("click", async () => {
+  const items = renderSaleCart(); if (!items.length) return;
+  const button = $("#record-sale"); button.disabled = true; $("#sale-cart-status").textContent = "Recording customer sale…";
+  try {
+    const result = await api("sales", "POST", { items, customer_full_name: $("#sale-customer-name").value, customer_phone: $("#sale-customer-phone").value, payment_status: $("#sale-payment-status").value, customer_notes: $("#sale-note").value });
+    saleCart.clear(); $("#sale-customer-name").value = ""; $("#sale-customer-phone").value = ""; $("#sale-note").value = ""; renderSaleCart();
+    $("#sale-cart-status").textContent = "Sale " + result.data.order_number + " recorded. Your share: " + money(result.data.reseller_earnings, result.data.currency) + ".";
+    await loadAccount();
+  } catch (error) { $("#sale-cart-status").textContent = error.message; }
+  finally { button.disabled = saleCart.size === 0; }
+});
 $("#refresh-inventory").addEventListener("click", loadInventoryAndOrders);
 $("#refresh-orders").addEventListener("click", loadInventoryAndOrders);
 $("#place-order").addEventListener("click", async () => {
