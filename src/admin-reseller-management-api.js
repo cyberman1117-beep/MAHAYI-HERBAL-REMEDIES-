@@ -77,10 +77,10 @@ async function stockOrders(request, env, id) {
   const reference = body.payment_reference === undefined ? existing.payment_reference : clean(body.payment_reference, 200);
   const notes = body.company_notes === undefined ? existing.company_notes : clean(body.company_notes, 4000);
   if (orderStatus === "cancelled" && existing.stock_reserved_at && !existing.stock_released_at && !existing.inventory_applied_at) {
-    const items = await env.DB.prepare("SELECT reseller_product_id, product_name, quantity FROM reseller_stock_order_items WHERE reseller_stock_order_id = ?").bind(id).all();
+    const items = await env.DB.prepare("SELECT i.reseller_product_id, i.product_name, i.quantity, p.track_stock FROM reseller_stock_order_items i LEFT JOIN reseller_products p ON p.id = i.reseller_product_id WHERE i.reseller_stock_order_id = ?").bind(id).all();
     const releaseStatements = [];
     for (const item of (items.results || [])) {
-      if (item.reseller_product_id) {
+      if (item.reseller_product_id && Number(item.track_stock) === 1) {
         releaseStatements.push(env.DB.prepare("UPDATE reseller_products SET stock_quantity = stock_quantity + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(item.quantity, item.reseller_product_id));
       }
     }
