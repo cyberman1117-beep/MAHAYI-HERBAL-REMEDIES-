@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Browse the approved MAHAYI HERBAL REMEDIES reseller product catalogue.">
+  <title>Reseller Catalogue | MAHAYI HERBAL REMEDIES</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <script type="module" src="../../assets/js/reseller-catalogue.js"></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#catalogue-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner">
+    <a class="brand" href="../index.html">MAHAYI HERBAL REMEDIES <span class="admin-label">Reseller Catalogue</span></a>
+    <div class="admin-account"><span data-account-email></span><a class="button button-small button-outline" href="../index.html">Dashboard</a></div>
+  </div></header>
+  <main id="catalogue-main" class="admin-main"><div class="container">
+    <div class="settings-heading"><div><p class="eyebrow">M.H.R. reseller programme</p><h1 id="catalogue-title">Product Catalogue</h1><p class="muted" id="catalogue-intro">Browse available products and open any product to see its full reseller pricing and stock details.</p></div><a class="button button-outline" href="../index.html">Back to dashboard</a></div>
+    <section class="settings-panel" id="catalogue-status-panel"><p class="settings-notice" id="catalogue-status" role="status">Checking your reseller access…</p></section>
+    <section class="settings-panel" id="catalogue-list-panel" hidden>
+      <div class="settings-heading"><div><h2>Available products</h2><p class="muted">Prices and availability are supplied by M.H.R.'s existing reseller catalogue.</p></div><button class="button button-outline" id="refresh-catalogue" type="button">Refresh catalogue</button></div>
+      <label class="field" for="catalogue-search"><span>Find a product</span><input id="catalogue-search" type="search" placeholder="Search product name, category or description"></label>
+      <p class="settings-notice" id="catalogue-results-status" role="status"></p>
+      <div class="admin-sections" id="catalogue-list"></div>
+    </section>
+    <section class="settings-panel" id="product-detail-panel" hidden>
+      <div class="settings-heading"><div><p class="eyebrow" id="detail-category">Reseller product</p><h2 id="detail-name">Product details</h2></div><a class="button button-outline" href="./">All products</a></div>
+      <p id="detail-description" class="muted"></p>
+      <div class="admin-sections" id="detail-information"></div>
+      <div class="settings-actions"><p class="muted">To add this item to a stock order or record a customer sale, return to your dashboard and use the existing order or sales controls.</p><a class="button button-primary" id="dashboard-product-link" href="../index.html">Go to dashboard</a></div>
+    </section>
+  </div></main>
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">MAHAYI HERBAL REMEDIES</a><p>© <span data-current-year>2026</span> MAHAYI HERBAL REMEDIES</p><a href="../../index.html">Main website</a></div></footer>
+</body>
+</html>
