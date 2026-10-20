@@ -171,6 +171,95 @@ export async function handleResellerPortal(request, env) {
       return json({ success: true, data: { id: created.id, order_number: orderNumber, total_amount: total, currency, payment_status: "pending", order_status: "submitted" } }, 201);
     }
 
+    if (action === "sales") {
+      const reseller = await getReseller(token, env);
+      if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
+      if (request.method === "GET") {
+        const orders = await env.DB.prepare(`
+          SELECT id, order_number, customer_full_name, customer_phone, currency, subtotal,
+                 reseller_earnings, company_earnings, payment_status, order_status, created_at
+          FROM reseller_orders WHERE reseller_id = ? ORDER BY created_at DESC, id DESC LIMIT 100
+        `).bind(reseller.id).all();
+        const items = await env.DB.prepare(`
+          SELECT i.reseller_order_id, i.product_name, i.quantity, i.customer_unit_price,
+                 i.reseller_unit_share, i.line_total, i.currency
+          FROM reseller_order_items i JOIN reseller_orders o ON o.id = i.reseller_order_id
+          WHERE o.reseller_id = ? ORDER BY i.id
+        `).bind(reseller.id).all();
+        return json({ success: true, data: { sales: orders.results || [], items: items.results || [] } });
+      }
+      if (request.method !== "POST") return json({ success: false, error: "Method not allowed." }, 405);
+      const body = await request.json();
+      if (!Array.isArray(body.items) || !body.items.length || body.items.length > 50) return json({ success: false, error: "Add at least one product to this sale." }, 400);
+      const quantities = new Map();
+      for (const item of body.items) {
+        const productId = Number(item.product_id), quantity = Number(item.quantity);
+        if (!Number.isSafeInteger(productId) || productId <= 0 || !Number.isSafeInteger(quantity) || quantity <= 0) return json({ success: false, error: "Each sale item needs a valid product and whole-number quantity." }, 400);
+        quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+      }
+      const saleItems = [];
+      let subtotal = 0, resellerEarnings = 0, companyEarnings = 0, currency = "ZAR";
+      for (const [productId, quantity] of quantities) {
+        const product = await env.DB.prepare(`
+          SELECT p.id, p.name, p.sku, p.currency, pp.customer_price, pp.reseller_share, pp.company_share,
+                 pp.minimum_order_quantity, i.quantity_available
+          FROM reseller_products p
+          JOIN reseller_product_pricing pp ON pp.reseller_product_id = p.id AND pp.is_enabled = 1
+          JOIN reseller_inventory i ON i.reseller_product_id = p.id AND i.reseller_id = ?
+          WHERE p.id = ?
+        `).bind(reseller.id, productId).first();
+        if (!product) return json({ success: false, error: "A selected product is not currently available for sale from your inventory." }, 400);
+        if (quantity < Number(product.minimum_order_quantity)) return json({ success: false, error: product.name + " requires a minimum order of " + product.minimum_order_quantity + "." }, 400);
+        if (quantity > Number(product.quantity_available)) return json({ success: false, error: "Your inventory does not have enough " + product.name + " for this sale." }, 409);
+        currency = product.currency || "ZAR";
+        const lineTotal = Math.round(Number(product.customer_price) * quantity * 100) / 100;
+        const resellerLine = Math.round(Number(product.reseller_share) * quantity * 100) / 100;
+        const companyLine = Math.round(Number(product.company_share) * quantity * 100) / 100;
+        subtotal = Math.round((subtotal + lineTotal) * 100) / 100;
+        resellerEarnings = Math.round((resellerEarnings + resellerLine) * 100) / 100;
+        companyEarnings = Math.round((companyEarnings + companyLine) * 100) / 100;
+        saleItems.push({ product, productId, quantity, lineTotal, resellerLine, companyLine });
+      }
+      const paymentStatus = body.payment_status === "pending" ? "pending" : "paid";
+      const customerName = clean(body.customer_full_name, 160);
+      const customerPhone = clean(body.customer_phone, 40);
+      const orderNumber = "MHR-SALE-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + crypto.randomUUID().slice(0,8).toUpperCase();
+      const created = await env.DB.prepare(`
+        INSERT INTO reseller_orders
+          (order_number, reseller_id, customer_full_name, customer_phone, currency, subtotal,
+           reseller_earnings, company_earnings, payment_status, order_status, customer_notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'fulfilled', ?)
+        RETURNING id
+      `).bind(orderNumber, reseller.id, customerName, customerPhone, currency, subtotal, resellerEarnings, companyEarnings, paymentStatus, clean(body.customer_notes, 2000)).first();
+      try {
+        const statements = [];
+        for (const item of saleItems) {
+          statements.push(env.DB.prepare(`
+            UPDATE reseller_inventory SET quantity_available = quantity_available - ?, updated_at = CURRENT_TIMESTAMP
+            WHERE reseller_id = ? AND reseller_product_id = ?
+          `).bind(item.quantity, reseller.id, item.productId));
+          statements.push(env.DB.prepare(`
+            INSERT INTO reseller_order_items
+              (reseller_order_id, reseller_product_id, product_name, product_sku, quantity, customer_unit_price,
+               reseller_unit_share, company_unit_share, line_total, reseller_line_earnings, company_line_earnings, currency)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(created.id, item.productId, item.product.name, item.product.sku || "", item.quantity,
+            Number(item.product.customer_price), Number(item.product.reseller_share), Number(item.product.company_share),
+            item.lineTotal, item.resellerLine, item.companyLine, item.product.currency || "ZAR"));
+          statements.push(env.DB.prepare(`
+            INSERT INTO reseller_inventory_movements
+              (reseller_id, reseller_product_id, movement_type, quantity_change, reference_type, reference_id, notes)
+            VALUES (?, ?, 'sale', ?, 'reseller_sale', ?, ?)
+          `).bind(reseller.id, item.productId, -item.quantity, created.id, "Customer sale " + orderNumber));
+        }
+        await env.DB.batch(statements);
+      } catch (error) {
+        await env.DB.prepare("DELETE FROM reseller_orders WHERE id = ?").bind(created.id).run();
+        throw error;
+      }
+      return json({ success: true, data: { id: created.id, order_number: orderNumber, subtotal, reseller_earnings: resellerEarnings, currency, payment_status: paymentStatus } }, 201);
+    }
+
     return json({ success: false, error: "Choose a valid reseller portal action." }, 400);
   } catch (error) {
     return errorResponse(error);
