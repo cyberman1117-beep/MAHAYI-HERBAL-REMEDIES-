@@ -209,7 +209,7 @@ export async function handleResellerPortal(request, env) {
           WHERE p.id = ?
         `).bind(reseller.id, productId).first();
         if (!product) return json({ success: false, error: "A selected product is not currently available for sale from your inventory." }, 400);
-        if (quantity < Number(product.minimum_order_quantity)) return json({ success: false, error: product.name + " requires a minimum order of " + product.minimum_order_quantity + "." }, 400);
+
         if (quantity > Number(product.quantity_available)) return json({ success: false, error: "Your inventory does not have enough " + product.name + " for this sale." }, 409);
         currency = product.currency || "ZAR";
         const lineTotal = Math.round(Number(product.customer_price) * quantity * 100) / 100;
