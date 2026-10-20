@@ -71,6 +71,21 @@ async function stockOrders(request, env, id) {
   if (orderStatus === "fulfilled" && paymentStatus !== "paid") return json({ success: false, error: "Mark the order paid before releasing stock into reseller inventory." }, 400);
   const reference = body.payment_reference === undefined ? existing.payment_reference : clean(body.payment_reference, 200);
   const notes = body.company_notes === undefined ? existing.company_notes : clean(body.company_notes, 4000);
+  if (orderStatus === "cancelled" && existing.stock_reserved_at && !existing.stock_released_at && !existing.inventory_applied_at) {
+    const items = await env.DB.prepare("SELECT reseller_product_id, product_name, quantity FROM reseller_stock_order_items WHERE reseller_stock_order_id = ?").bind(id).all();
+    const releaseStatements = [];
+    for (const item of (items.results || [])) {
+      if (item.reseller_product_id) {
+        releaseStatements.push(env.DB.prepare("UPDATE reseller_products SET stock_quantity = stock_quantity + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(item.quantity, item.reseller_product_id));
+      }
+    }
+    releaseStatements.push(env.DB.prepare(`
+      UPDATE reseller_stock_orders SET payment_status = ?, order_status = ?, payment_reference = ?,
+        company_notes = ?, stock_released_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(paymentStatus, orderStatus, reference, notes, id));
+    await env.DB.batch(releaseStatements);
+    return json({ success: true, data: { id, payment_status: paymentStatus, order_status: orderStatus, stock_released: true } });
+  }
   const statements = [];
   if (orderStatus === "fulfilled" && !existing.inventory_applied_at) {
     const items = await env.DB.prepare("SELECT reseller_product_id, product_name, quantity FROM reseller_stock_order_items WHERE reseller_stock_order_id = ?").bind(id).all();
