@@ -32,7 +32,8 @@ async function accounts(request, env, id) {
   if (!existing) return json({ success: false, error: "Reseller account not found." }, 404);
   const status = body.status === undefined ? existing.status : clean(body.status, 20);
   if (!["pending", "active", "suspended", "rejected"].includes(status)) return json({ success: false, error: "Choose a valid reseller status." }, 400);
-  const payLater = body.pay_later_enabled === undefined ? Number(existing.pay_later_enabled) : (body.pay_later_enabled ? 1 : 0);
+  let payLater = body.pay_later_enabled === undefined ? Number(existing.pay_later_enabled) : (body.pay_later_enabled ? 1 : 0);
+  if (status !== "active") payLater = 0;
   const notes = body.notes === undefined ? null : clean(body.notes, 4000);
   const payLaterNotes = body.pay_later_notes === undefined ? null : clean(body.pay_later_notes, 4000);
   await env.DB.prepare(`
@@ -74,6 +75,7 @@ async function stockOrders(request, env, id) {
   if (!["submitted", "confirmed", "processing", "ready", "fulfilled", "cancelled"].includes(orderStatus)) return json({ success: false, error: "Invalid order status." }, 400);
   if (existing.inventory_applied_at && orderStatus !== "fulfilled") return json({ success: false, error: "This order has already added stock to reseller inventory. Use a return or adjustment instead of changing its fulfilment status." }, 409);
   if (orderStatus === "fulfilled" && paymentStatus !== "paid") return json({ success: false, error: "Mark the order paid before releasing stock into reseller inventory." }, 400);
+  if (existing.stock_released_at && orderStatus === "fulfilled") return json({ success: false, error: "This order was cancelled and its company stock reservation was released. Create a new order instead." }, 409);
   const reference = body.payment_reference === undefined ? existing.payment_reference : clean(body.payment_reference, 200);
   const notes = body.company_notes === undefined ? existing.company_notes : clean(body.company_notes, 4000);
   if (orderStatus === "cancelled" && existing.stock_reserved_at && !existing.stock_released_at && !existing.inventory_applied_at) {
