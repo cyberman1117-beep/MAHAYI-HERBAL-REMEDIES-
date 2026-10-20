@@ -12,6 +12,7 @@ import { handleContentPages } from "./content-pages-api.js";
 import { handleSeoSettings } from "./seo-settings-api.js";
 import { handleAdminResellerCatalog } from "./reseller-catalog-api.js";
 import { handleResellerPortal } from "./reseller-portal-api.js";
+import { handleAdminResellerManagement } from "./admin-reseller-management-api.js";
 export default { async fetch(request, env, ctx) {
   const url = new URL(request.url);
   if (url.pathname === "/api/categories") return handleCategoryApi(request, env, originalWorker);
@@ -27,6 +28,7 @@ export default { async fetch(request, env, ctx) {
   if (url.pathname === "/api/seo-settings") return handleSeoSettings(request, env);
   if (url.pathname === "/api/admin-reseller-catalog") return handleAdminResellerCatalog(request, env);
   if (url.pathname === "/api/reseller-portal") return handleResellerPortal(request, env);
+  if (url.pathname === "/api/admin-reseller-management") return handleAdminResellerManagement(request, env);
   if (url.pathname === "/api/product-groups" && request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
