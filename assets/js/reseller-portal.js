@@ -97,7 +97,7 @@ function renderProducts(data) {
     const earnings = document.createElement("p"); earnings.className = "muted"; earnings.textContent = "Your share per unit: " + money(product.reseller_share, product.currency);
     const wholesale = document.createElement("p"); wholesale.className = "muted"; wholesale.textContent = "Upfront stock price per unit: " + money(product.stock_unit_price, product.currency);
     const minimum = document.createElement("p"); minimum.className = "muted"; minimum.textContent = "Minimum quantity: " + product.minimum_order_quantity;
-    const stock = document.createElement("p"); stock.className = "muted"; stock.textContent = Number(product.track_stock) === 1 ? "Available company stock: " + product.stock_quantity : "Stock tracked by arrangement";
+    const stock = document.createElement("p"); stock.className = "muted"; stock.textContent = (Number(product.track_stock) === 1 ? "Available company stock: " + product.stock_quantity : "Company stock tracked by arrangement") + " · Your inventory: " + Number(product.reseller_stock_quantity || 0);
     details.append(title, category, description, price, earnings, wholesale, minimum, stock);
     const controls = document.createElement("div");
     controls.style.display = "grid"; controls.style.gap = ".5rem"; controls.style.minWidth = "150px";
@@ -114,9 +114,11 @@ function renderProducts(data) {
       $("#cart-status").textContent = product.name + " added to your stock order.";
     });
     const addSale = document.createElement("button"); addSale.className = "button button-outline"; addSale.type = "button"; addSale.textContent = "Add to sale";
+    if (Number(product.reseller_stock_quantity || 0) < 1) { addSale.disabled = true; addSale.textContent = "No stock to sell"; }
     addSale.addEventListener("click", () => {
       const quantity = Number(qty.value);
-      if (!Number.isSafeInteger(quantity) || quantity < Number(product.minimum_order_quantity || 1)) { $("#sale-cart-status").textContent = "Enter a whole-number quantity that meets the minimum order."; return; }
+      if (!Number.isSafeInteger(quantity) || quantity < 1) { $("#sale-cart-status").textContent = "Enter a whole-number quantity for the customer sale."; return; }
+      if (quantity + (saleCart.get(Number(product.id)) || 0) > Number(product.reseller_stock_quantity || 0)) { $("#sale-cart-status").textContent = "Your inventory does not have enough " + product.name + " for this sale."; return; }
       saleCart.set(Number(product.id), (saleCart.get(Number(product.id)) || 0) + quantity);
       renderSaleCart();
       $("#sale-cart-status").textContent = product.name + " added to the customer sale.";
@@ -145,7 +147,9 @@ function renderCart() {
     row.append(details, remove); box.append(row);
   }
   if (!chosen.length) { const p = document.createElement("p"); p.className = "muted"; p.textContent = "Your order is empty."; box.append(p); }
-  $("#cart-total").textContent = "Total to pay M.H.R.: " + money(total);
+  const payLater = $("#pay-later-mode")?.checked === true;
+  $("#cart-total").textContent = payLater ? "Potential company share due as stock sells: " + money(total) : "Total to pay M.H.R.: " + money(total);
+  $("#place-order").textContent = payLater ? "Request pay-later stock" : "Place stock order";
   $("#place-order").disabled = !chosen.length;
   return chosen;
 }
@@ -198,10 +202,24 @@ async function loadInventoryAndOrders() {
     $("#orders-status").textContent = orders.length ? orders.length + " stock order(s)." : "You have not placed a stock order yet.";
     for (const order of orders) {
       const lines = items.filter(item => Number(item.reseller_stock_order_id) === Number(order.id));
-      const card = makeCard(order.order_number, ["Total: " + money(order.total_amount, order.currency), "Payment: " + order.payment_status, "Stock order: " + order.order_status, "Submitted: " + order.created_at, ...lines.map(item => item.product_name + " × " + item.quantity), order.payment_reference ? "Payment reference: " + order.payment_reference : "Payment reference: not recorded"]);
+      const card = makeCard(order.order_number, ["Total: " + money(order.total_amount, order.currency), "Payment: " + order.payment_status, "Arrangement: " + (order.fulfilment_mode === "pay_later" ? "Approved pay-later stock" : "Upfront stock purchase"), "Stock order: " + order.order_status, "Submitted: " + order.created_at, ...lines.map(item => item.product_name + " × " + item.quantity), order.payment_reference ? "Payment reference: " + order.payment_reference : "Payment reference: not recorded"]);
       list.append(card);
     }
   } catch (e) { $("#orders-status").textContent = e.message; }
+}
+async function loadLedger() {
+  try {
+    const result = await api("ledger");
+    const outstanding = Number(result.data?.outstanding || 0);
+    $("#outstanding-balance").textContent = money(outstanding);
+    $("#outstanding-note").textContent = outstanding > 0 ? "Company share to settle" : "No outstanding balance";
+    const entries = result.data?.entries || [], list = $("#ledger-list"); list.replaceChildren();
+    $("#ledger-status").textContent = entries.length ? entries.length + " ledger entry(s)." : "No pay-later sales or settlements recorded.";
+    for (const entry of entries) {
+      const kind = entry.movement_type === "settlement" ? "Settlement received" : entry.movement_type === "stock_sold_on_credit" ? "Company share due from sale" : "Account adjustment";
+      list.append(makeCard(kind, [(entry.amount_debit > 0 ? "Amount due: " + money(entry.amount_debit) : "Payment received: " + money(entry.amount_credit)), entry.payment_reference ? "Reference: " + entry.payment_reference : "", entry.notes || "", entry.created_at].filter(Boolean)));
+    }
+  } catch (e) { $("#ledger-status").textContent = e.message; }
 }
 async function loadAccount() {
   currentUser = auth.currentUser;
@@ -229,7 +247,8 @@ async function loadAccount() {
     $("#pay-later-note").textContent = Number(reseller.pay_later_enabled) === 1 ? "M.H.R. has granted your account restricted distributor privileges. Standard upfront stock orders remain available here; arrange the approved pay-later stock issue and settlement terms directly with M.H.R." : "The standard buy-stock-first arrangement is active for your account. Receiving stock and paying later is restricted to distributors approved by M.H.R.";
     $(".admin-status").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved distributor" : "Standard reseller";
     $(".admin-stats .stat-card:nth-child(3) strong").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved" : "No access";
-    $(".admin-stats .stat-card:nth-child(3) small").textContent = Number(reseller.pay_later_enabled) === 1 ? "Contact M.H.R. for settlement terms" : "Reserved for selected distributors";
+    $(".admin-stats .stat-card:nth-child(3) small").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved for pay-later stock requests" : "Reserved for selected distributors";
+    $("#pay-later-option").hidden = Number(reseller.pay_later_enabled) !== 1;
     $("#products-status").textContent = "Loading products…";
     const productData = await api("products");
     renderProducts(productData.data?.products || []);
@@ -237,6 +256,7 @@ async function loadAccount() {
     renderSaleCart();
     await loadInventoryAndOrders();
     await loadSales();
+    await loadLedger();
   } catch (error) {
     showPanel("#auth-panel");
     setMode("login");
@@ -268,6 +288,8 @@ switchMode.addEventListener("click", () => setMode(mode === "register" ? "login"
 $("[data-logout]").addEventListener("click", async () => { await signOut(auth); setMode("login"); });
 document.querySelectorAll("[data-refresh]").forEach((button) => button.addEventListener("click", loadAccount));
 $("#refresh-sales").addEventListener("click", loadSales);
+$("#refresh-ledger").addEventListener("click", loadLedger);
+$("#pay-later-mode").addEventListener("change", renderCart);
 $("#record-sale").addEventListener("click", async () => {
   const items = renderSaleCart(); if (!items.length) return;
   const button = $("#record-sale"); button.disabled = true; $("#sale-cart-status").textContent = "Recording customer sale…";
@@ -288,9 +310,10 @@ $("#place-order").addEventListener("click", async () => {
   button.disabled = true;
   $("#cart-status").textContent = "Submitting stock order…";
   try {
-    const result = await api("stock-orders", "POST", { items, reseller_notes: $("#order-note").value });
+    const fulfilmentMode = $("#pay-later-mode").checked ? "pay_later" : "upfront";
+    const result = await api("stock-orders", "POST", { items, fulfilment_mode: fulfilmentMode, reseller_notes: $("#order-note").value });
     cart.clear(); $("#order-note").value = ""; renderCart();
-    $("#cart-status").textContent = "Order " + result.data.order_number + " submitted. Total payable: " + money(result.data.total_amount, result.data.currency) + ". Please arrange payment with M.H.R.; stock is not released until payment is verified.";
+    $("#cart-status").textContent = fulfilmentMode === "pay_later" ? "Request " + result.data.order_number + " submitted. M.H.R. must approve and release the stock. The company share becomes due as credit stock is sold." : "Order " + result.data.order_number + " submitted. Total payable: " + money(result.data.total_amount, result.data.currency) + ". Please arrange payment with M.H.R.; stock is not released until payment is verified.";
     await loadAccount();
   } catch (error) { $("#cart-status").textContent = error.message; }
   finally { button.disabled = cart.size === 0; }
