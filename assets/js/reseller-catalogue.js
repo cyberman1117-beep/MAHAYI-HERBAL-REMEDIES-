@@ -47,50 +47,32 @@ function openProduct(product) {
 }
 function renderList() {
   const query = $("#catalogue-search").value.trim().toLowerCase();
-  const matching = products.filter((product) => [product.name, product.package_label, product.category_name, product.description, product.sku]
+  const matching = products.filter((product) => [product.name, product.category_name, product.description, product.sku]
     .some((value) => String(value || "").toLowerCase().includes(query)));
-  const groups = new Map();
+  const list = $("#catalogue-results"); list.replaceChildren();
+  $("#catalogue-results-status").textContent = matching.length + " product" + (matching.length === 1 ? "" : "s") + " found.";
   for (const product of matching) {
-    const key = product.package_group ? "group:" + product.package_group : "product:" + product.id;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(product);
-  }
-  const list = $("#catalogue-list");
-  list.replaceChildren();
-  $("#catalogue-results-status").textContent = groups.size + " product group" + (groups.size === 1 ? "" : "s") + " found.";
-  for (const options of groups.values()) {
-    const product = options[0];
-    const card = document.createElement("article");
-    card.className = "admin-panel";
-    const marker = document.createElement("div");
-    marker.className = "panel-icon";
-    marker.textContent = "M.H.R.";
+    const card = document.createElement("article"); card.className = "admin-panel";
+    const marker = document.createElement("div"); marker.className = "panel-icon"; marker.textContent = "M.H.R.";
     const details = document.createElement("div");
     const title = document.createElement("h2"); title.textContent = product.name;
-    const category = document.createElement("p"); category.className = "muted"; category.textContent = product.category_name || "Reseller product";
-    const description = document.createElement("p"); description.className = "muted"; description.textContent = product.description || "Quality product supplied by M.H.R.";
+    const category = document.createElement("p"); category.className = "muted"; category.textContent = product.category_name || "Distributor product";
+    const description = document.createElement("p"); description.className = "muted"; description.textContent = product.description || "Choose the package that suits your budget.";
     details.append(title, category, description);
-    if (product.image_url && /^https:\/\//i.test(product.image_url)) {
-      const image = document.createElement("img"); image.src = product.image_url; image.alt = product.name; image.loading = "lazy";
-      image.style.width = "min(100%, 280px)"; image.style.height = "auto"; image.style.objectFit = "contain"; image.style.borderRadius = ".75rem"; details.prepend(image);
-    }
+    if (product.image_url && /^https?:\/\//i.test(product.image_url)) { const image = document.createElement("img"); image.src = product.image_url; image.alt = product.name; image.loading = "lazy"; image.style.width = "min(100%, 240px)"; image.style.height = "auto"; image.style.objectFit = "contain"; details.prepend(image); }
     const table = document.createElement("table"); table.className = "data-table";
-    const head = document.createElement("thead"), headRow = document.createElement("tr");
-    for (const label of ["Package", "Customer price", "Your earnings", "M.H.R. share"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; headRow.append(th); }
-    head.append(headRow); table.append(head);
-    const body = document.createElement("tbody");
-    for (const option of options) {
+    const thead = document.createElement("thead"), tr = document.createElement("tr");
+    for (const label of ["Package", "Stock amount", "Resale amount", "Your commission"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; tr.append(th); }
+    thead.append(tr); table.append(thead);
+    const tbody = document.createElement("tbody");
+    for (const pkg of (product.packages || []).filter((item) => Number(item.is_enabled) === 1)) {
       const row = document.createElement("tr");
-      for (const value of [option.package_label || "Standard", money(option.customer_price, option.currency), money(option.reseller_share, option.currency), money(option.stock_unit_price, option.currency)]) { const td = document.createElement("td"); td.textContent = value; row.append(td); }
-      const view = document.createElement("button"); view.className = "button button-primary"; view.type = "button"; view.textContent = "View option";
-      view.addEventListener("click", () => openProduct(option));
-      const cell = document.createElement("td"); cell.append(view); row.append(cell);
-      body.append(row);
+      for (const value of [pkg.package_label, money(pkg.stock_unit_price, product.currency), money(pkg.customer_price, product.currency), money(pkg.reseller_share, product.currency)]) { const td = document.createElement("td"); td.textContent = value || ""; row.append(td); }
+      tbody.append(row);
     }
-    const lastHead = document.createElement("th"); lastHead.scope = "col"; lastHead.textContent = "Details"; headRow.append(lastHead);
-    table.append(body);
-    const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
-    card.append(marker, details, wrap); list.append(card);
+    table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
+    const button = document.createElement("button"); button.className = "button button-primary"; button.type = "button"; button.textContent = "View product"; button.addEventListener("click", () => openProduct(product));
+    card.append(marker, details, wrap, button); list.append(card);
   }
 }
 function renderRoute() {
@@ -121,24 +103,18 @@ function renderRoute() {
   if (!image.hidden) { image.src = product.image_url; image.alt = product.name; }
   $("#detail-information").replaceChildren();
   addDetailLine("SKU", product.sku || "Not provided");
-  addDetailLine("Selected package", product.package_label || "Standard package");
-  addDetailLine("Customer selling price", money(product.customer_price, product.currency));
-  addDetailLine("Your share per unit", money(product.reseller_share, product.currency));
-  addDetailLine("Upfront stock price per unit", money(product.stock_unit_price, product.currency));
-  addDetailLine("Minimum order quantity", String(product.minimum_order_quantity || 1));
-  addDetailLine("Company stock", Number(product.track_stock) === 1 ? String(product.stock_quantity) + " available" : "Stock is managed by arrangement");
-  addDetailLine("Your inventory", String(Number(product.reseller_stock_quantity || 0)) + " available to sell");
-  const related = product.package_group ? products.filter((item) => item.package_group === product.package_group) : [];
-  if (related.length > 1) {
-    const heading = document.createElement("h3"); heading.textContent = "Available package options"; $("#detail-information").append(heading);
-    const table = document.createElement("table"); table.className = "data-table";
-    const thead = document.createElement("thead"), tr = document.createElement("tr");
-    for (const label of ["Package", "Customer price", "Your earnings", "M.H.R. share"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; tr.append(th); }
-    thead.append(tr); table.append(thead);
-    const tbody = document.createElement("tbody");
-    for (const option of related) { const row = document.createElement("tr"); for (const value of [option.package_label || "Standard", money(option.customer_price, option.currency), money(option.reseller_share, option.currency), money(option.stock_unit_price, option.currency)]) { const td = document.createElement("td"); td.textContent = value; row.append(td); } tbody.append(row); }
-    table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table); $("#detail-information").append(wrap);
+  const table = document.createElement("table"); table.className = "data-table";
+  const thead = document.createElement("thead"), header = document.createElement("tr");
+  for (const label of ["Package", "Stock amount", "Resale amount", "Your commission", "Stock available", "Your inventory"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; header.append(th); }
+  thead.append(header); table.append(thead);
+  const tbody = document.createElement("tbody");
+  for (const pkg of (product.packages || []).filter((item) => Number(item.is_enabled) === 1)) {
+    const row = document.createElement("tr");
+    for (const value of [pkg.package_label, money(pkg.stock_unit_price, product.currency), money(pkg.customer_price, product.currency), money(pkg.reseller_share, product.currency), String(pkg.stock_quantity), String(pkg.reseller_stock_quantity || 0)]) { const td = document.createElement("td"); td.textContent = value; row.append(td); }
+    tbody.append(row);
   }
+  table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
+  $("#detail-information").append(wrap);
   $("#dashboard-product-link").href = "../index.html";
 }
 async function loadCatalogue() {
