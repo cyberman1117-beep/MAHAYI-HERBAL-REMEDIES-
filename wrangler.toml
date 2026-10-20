@@ -11,3 +11,5 @@ database_id = "ec327d4e-9e81-462e-a2cf-2dc657d35caf"
 [vars]
 COURIER_GUY_PROVIDER_ID = "CLO259"
 COURIER_GUY_COLLECTION_ADDRESS = "{\"type\":\"business\",\"company\":\"CLOTHING STORE\",\"street_address\":\"250D Church Street\",\"local_area\":\"Nkowankoma Section D\",\"city\":\"Letaba\",\"zone\":\"Limpopo\",\"country\":\"ZA\",\"code\":\"0870\"}"
+CLOUDINARY_API_KEY = "812593221885864"
+CLOUDINARY_CLOUD_NAME = "ey42jec0"
