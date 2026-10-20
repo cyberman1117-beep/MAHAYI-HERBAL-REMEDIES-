@@ -17,7 +17,7 @@ function errorResponse(error) {
 
 async function getReseller(token, env) {
   return env.DB.prepare(
-    "SELECT id, firebase_uid, email, full_name, phone, status, approved_at, created_at FROM resellers WHERE firebase_uid = ?"
+    "SELECT id, firebase_uid, email, full_name, phone, status, approved_at, pay_later_enabled, created_at FROM resellers WHERE firebase_uid = ?"
   ).bind(token.sub).first();
 }
 
