@@ -138,6 +138,21 @@ export async function handleAdminResellerManagement(request, env) {
     const id = idValue(url.searchParams.get("id"));
     if (resource === "accounts") return await accounts(request, env, id);
     if (resource === "stock-orders") return await stockOrders(request, env, id);
+    if (resource === "sales" && request.method === "GET") {
+      const sales = await env.DB.prepare(`
+        SELECT o.id, o.order_number, o.reseller_id, r.full_name AS reseller_name, r.email AS reseller_email,
+               o.customer_full_name, o.customer_phone, o.currency, o.subtotal, o.reseller_earnings,
+               o.company_earnings, o.payment_status, o.order_status, o.created_at
+        FROM reseller_orders o JOIN resellers r ON r.id = o.reseller_id
+        ORDER BY o.created_at DESC, o.id DESC LIMIT 500
+      `).all();
+      const items = await env.DB.prepare(`
+        SELECT i.reseller_order_id, i.product_name, i.quantity, i.customer_unit_price,
+               i.reseller_line_earnings, i.line_total, i.currency
+        FROM reseller_order_items i ORDER BY i.reseller_order_id DESC, i.id
+      `).all();
+      return json({ success: true, data: { sales: sales.results || [], items: items.results || [] } });
+    }
     return json({ success: false, error: "Choose accounts or stock-orders." }, 400);
   } catch (error) {
     return errorResponse(error);
