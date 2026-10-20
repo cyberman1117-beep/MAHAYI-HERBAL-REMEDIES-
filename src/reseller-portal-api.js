@@ -212,7 +212,7 @@ export async function handleResellerPortal(request, env) {
           FROM reseller_orders WHERE reseller_id = ? ORDER BY created_at DESC, id DESC LIMIT 100
         `).bind(reseller.id).all();
         const items = await env.DB.prepare(`
-          SELECT i.reseller_order_id, i.product_name, i.quantity, i.customer_unit_price,
+          SELECT i.reseller_order_id, i.product_name, i.package_label, i.quantity, i.customer_unit_price,
                  i.reseller_unit_share, i.line_total, i.currency
           FROM reseller_order_items i JOIN reseller_orders o ON o.id = i.reseller_order_id
           WHERE o.reseller_id = ? ORDER BY i.id
@@ -221,36 +221,36 @@ export async function handleResellerPortal(request, env) {
       }
       if (request.method !== "POST") return json({ success: false, error: "Method not allowed." }, 405);
       const body = await request.json();
-      if (!Array.isArray(body.items) || !body.items.length || body.items.length > 50) return json({ success: false, error: "Add at least one product to this sale." }, 400);
+      if (!Array.isArray(body.items) || !body.items.length || body.items.length > 50) return json({ success: false, error: "Choose at least one package for this sale." }, 400);
       const quantities = new Map();
       for (const item of body.items) {
-        const productId = Number(item.product_id), quantity = Number(item.quantity);
-        if (!Number.isSafeInteger(productId) || productId <= 0 || !Number.isSafeInteger(quantity) || quantity <= 0) return json({ success: false, error: "Each sale item needs a valid product and whole-number quantity." }, 400);
-        quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+        const packageId = Number(item.package_id), quantity = Number(item.quantity);
+        if (!Number.isSafeInteger(packageId) || packageId <= 0 || !Number.isSafeInteger(quantity) || quantity <= 0) return json({ success: false, error: "Each sale row needs a package and whole-number quantity." }, 400);
+        quantities.set(packageId, (quantities.get(packageId) || 0) + quantity);
       }
       const saleItems = [];
       let subtotal = 0, resellerEarnings = 0, companyEarnings = 0, currency = "ZAR";
-      for (const [productId, quantity] of quantities) {
-        const product = await env.DB.prepare(`
-          SELECT p.id, p.name, p.package_label, p.sku, p.currency, pp.customer_price, pp.reseller_share, pp.company_share,
-                 pp.minimum_order_quantity, i.quantity_available, i.pay_later_quantity
-          FROM reseller_products p
-          JOIN reseller_product_pricing pp ON pp.reseller_product_id = p.id AND pp.is_enabled = 1
-          JOIN reseller_inventory i ON i.reseller_product_id = p.id AND i.reseller_id = ?
-          WHERE p.id = ?
-        `).bind(reseller.id, productId).first();
-        if (!product) return json({ success: false, error: "A selected product is not currently available for sale from your inventory." }, 400);
-
-        if (quantity > Number(product.quantity_available)) return json({ success: false, error: "Your inventory does not have enough " + product.name + " for this sale." }, 409);
-        const creditQuantity = Math.min(quantity, Number(product.pay_later_quantity || 0));
-        currency = product.currency || "ZAR";
-        const lineTotal = Math.round(Number(product.customer_price) * quantity * 100) / 100;
-        const resellerLine = Math.round(Number(product.reseller_share) * quantity * 100) / 100;
-        const companyLine = Math.round(Number(product.company_share) * quantity * 100) / 100;
+      for (const [packageId, quantity] of quantities) {
+        const pkg = await env.DB.prepare(`
+          SELECT pkg.id AS package_id, pkg.reseller_product_id AS product_id, pkg.package_label, pkg.stock_amount, pkg.resale_amount, pkg.commission,
+                 pkg.minimum_order_quantity, ri.quantity_available, ri.pay_later_quantity, p.name, p.sku, p.currency
+          FROM reseller_product_packages pkg
+          JOIN reseller_products p ON p.id = pkg.reseller_product_id
+          JOIN reseller_package_inventory ri ON ri.package_id = pkg.id AND ri.reseller_id = ?
+          LEFT JOIN reseller_categories c ON c.id = p.category_id
+          WHERE pkg.id = ? AND pkg.is_enabled = 1 AND p.status = 'active' AND (p.category_id IS NULL OR c.is_enabled = 1)
+        `).bind(reseller.id, packageId).first();
+        if (!pkg) return json({ success: false, error: "A selected package is not available in your inventory." }, 400);
+        if (quantity > Number(pkg.quantity_available)) return json({ success: false, error: "Your inventory does not have enough " + pkg.name + " (" + pkg.package_label + ") for this sale." }, 409);
+        const creditQuantity = Math.min(quantity, Number(pkg.pay_later_quantity || 0));
+        currency = pkg.currency || "ZAR";
+        const lineTotal = Math.round(Number(pkg.resale_amount) * quantity * 100) / 100;
+        const resellerLine = Math.round(Number(pkg.commission) * quantity * 100) / 100;
+        const companyLine = Math.round(Number(pkg.stock_amount) * quantity * 100) / 100;
         subtotal = Math.round((subtotal + lineTotal) * 100) / 100;
         resellerEarnings = Math.round((resellerEarnings + resellerLine) * 100) / 100;
         companyEarnings = Math.round((companyEarnings + companyLine) * 100) / 100;
-        saleItems.push({ product, productId, quantity, creditQuantity, lineTotal, resellerLine, companyLine });
+        saleItems.push({ pkg, packageId, productId: Number(pkg.product_id), quantity, creditQuantity, lineTotal, resellerLine, companyLine });
       }
       const paymentStatus = body.payment_status === "pending" ? "pending" : "paid";
       const customerName = clean(body.customer_full_name, 160);
@@ -267,29 +267,29 @@ export async function handleResellerPortal(request, env) {
         const statements = [];
         for (const item of saleItems) {
           statements.push(env.DB.prepare(`
-            UPDATE reseller_inventory SET quantity_available = quantity_available - ?,
+            UPDATE reseller_package_inventory SET quantity_available = quantity_available - ?,
               pay_later_quantity = pay_later_quantity - ?, updated_at = CURRENT_TIMESTAMP
-            WHERE reseller_id = ? AND reseller_product_id = ?
-          `).bind(item.quantity, item.creditQuantity, reseller.id, item.productId));
+            WHERE reseller_id = ? AND package_id = ? AND quantity_available >= ?
+          `).bind(item.quantity, item.creditQuantity, reseller.id, item.packageId, item.quantity));
           statements.push(env.DB.prepare(`
             INSERT INTO reseller_order_items
-              (reseller_order_id, reseller_product_id, product_name, product_sku, quantity, customer_unit_price,
+              (reseller_order_id, reseller_product_id, package_id, package_label, product_name, product_sku, quantity, customer_unit_price,
                reseller_unit_share, company_unit_share, line_total, reseller_line_earnings, company_line_earnings, currency)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(created.id, item.productId, (item.product.package_label ? item.product.name + " — " + item.product.package_label : item.product.name), item.product.sku || "", item.quantity,
-            Number(item.product.customer_price), Number(item.product.reseller_share), Number(item.product.company_share),
-            item.lineTotal, item.resellerLine, item.companyLine, item.product.currency || "ZAR"));
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(created.id, item.productId, item.packageId, item.pkg.package_label, item.pkg.name + " — " + item.pkg.package_label, item.pkg.sku || "", item.quantity,
+            Number(item.pkg.resale_amount), Number(item.pkg.commission), Number(item.pkg.stock_amount),
+            item.lineTotal, item.resellerLine, item.companyLine, item.pkg.currency || "ZAR"));
           statements.push(env.DB.prepare(`
             INSERT INTO reseller_inventory_movements
-              (reseller_id, reseller_product_id, movement_type, quantity_change, reference_type, reference_id, notes)
-            VALUES (?, ?, 'sale', ?, 'reseller_sale', ?, ?)
-          `).bind(reseller.id, item.productId, -item.quantity, created.id, "Customer sale " + orderNumber));
+              (reseller_id, reseller_product_id, package_id, movement_type, quantity_change, reference_type, reference_id, notes)
+            VALUES (?, ?, ?, 'sale', ?, 'reseller_sale', ?, ?)
+          `).bind(reseller.id, item.productId, item.packageId, -item.quantity, created.id, "Customer sale " + orderNumber + " (" + item.pkg.package_label + ")"));
           if (item.creditQuantity > 0) {
             statements.push(env.DB.prepare(`
               INSERT INTO reseller_company_ledger
-                (reseller_id, reseller_product_id, movement_type, amount_debit, reference_type, reference_id, notes)
-              VALUES (?, ?, 'stock_sold_on_credit', ?, 'reseller_sale', ?, ?)
-            `).bind(reseller.id, item.productId, Math.round(Number(item.product.company_share) * item.creditQuantity * 100) / 100, created.id, "Company share due from sale " + orderNumber));
+                (reseller_id, reseller_product_id, package_id, movement_type, amount_debit, reference_type, reference_id, notes)
+              VALUES (?, ?, ?, 'stock_sold_on_credit', ?, 'reseller_sale', ?, ?)
+            `).bind(reseller.id, item.productId, item.packageId, Math.round(Number(item.pkg.stock_amount) * item.creditQuantity * 100) / 100, created.id, "Company share due from sale " + orderNumber + " (" + item.pkg.package_label + ")"));
           }
         }
         await env.DB.batch(statements);
@@ -299,7 +299,6 @@ export async function handleResellerPortal(request, env) {
       }
       return json({ success: true, data: { id: created.id, order_number: orderNumber, subtotal, reseller_earnings: resellerEarnings, currency, payment_status: paymentStatus } }, 201);
     }
-
     return json({ success: false, error: "Choose a valid reseller portal action." }, 400);
   } catch (error) {
     return errorResponse(error);
