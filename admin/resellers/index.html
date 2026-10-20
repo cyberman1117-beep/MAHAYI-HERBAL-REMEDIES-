@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Manage the independent MAHAYI HERBAL REMEDIES reseller catalogue.">
+  <title>Reseller Programme | MAHAYI HERBAL REMEDIES Admin</title>
+  <link rel="stylesheet" href="../../assets/css/styles.css">
+  <script type="module" src="../../assets/js/firebase-auth.js"></script>
+  <script src="../../assets/js/site.js" defer></script>
+</head>
+<body class="admin-page">
+  <a class="skip-link" href="#reseller-main">Skip to content</a>
+  <header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">MAHAYI HERBAL REMEDIES <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+  <main id="reseller-main" class="admin-main"><div class="container">
+    <div class="settings-heading"><div><p class="eyebrow">Separate business programme</p><h1>Reseller Catalogue</h1><p class="muted">Manage reseller products, categories, customer prices and profit shares independently of the normal shop catalogue.</p></div><a class="button button-outline" href="../">Back to dashboard</a></div>
+    <section class="settings-panel" aria-labelledby="category-title">
+      <div class="settings-heading"><div><h2 id="category-title">Reseller categories</h2><p class="muted">These categories are only for the reseller programme.</p></div></div>
+      <form class="settings-form" data-category-form>
+        <input type="hidden" name="id">
+        <div class="settings-fields settings-fields-two">
+          <label class="field"><span>Category name</span><input name="name" required maxlength="120" placeholder="e.g. Seamoss"></label>
+          <label class="field"><span>Slug (optional)</span><input name="slug" maxlength="120" placeholder="seamoss"></label>
+          <label class="field field-wide"><span>Description</span><textarea name="description" rows="2" maxlength="1000" placeholder="What belongs in this category?"></textarea></label>
+          <label class="field"><span>Sort order</span><input name="sort_order" type="number" min="0" step="1" value="0"></label>
+          <label class="field"><span>Status</span><select name="is_enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></label>
+        </div>
+        <div class="settings-actions"><span class="settings-load-status" data-category-status role="status">Ready.</span><div><button class="button button-outline" type="button" data-category-cancel hidden>Cancel edit</button> <button class="button button-primary" type="submit" data-category-save>Save category</button></div></div>
+      </form>
+      <div class="settings-notice" data-category-list-status role="status">Loading reseller categories…</div>
+      <div class="admin-sections" data-category-list></div>
+    </section>
+    <section class="settings-panel" aria-labelledby="product-title">
+      <div class="settings-heading"><div><h2 id="product-title" data-product-heading>Add reseller product</h2><p class="muted">A product must be created here separately. It will not be copied from the retail catalogue.</p></div></div>
+      <form class="settings-form" data-product-form>
+        <input type="hidden" name="id">
+        <fieldset class="settings-group"><legend>Product details</legend>
+          <div class="settings-fields settings-fields-two">
+            <label class="field"><span>Product name</span><input name="name" required maxlength="160" placeholder="e.g. Raw seamoss"></label>
+            <label class="field"><span>SKU (optional)</span><input name="sku" maxlength="80" placeholder="Reseller SKU"></label>
+            <label class="field"><span>Reseller category</span><select name="category_id"><option value="">Uncategorized</option></select></label>
+            <label class="field"><span>Status</span><select name="status"><option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option></select></label>
+            <label class="field field-wide"><span>Description</span><textarea name="description" rows="3" maxlength="5000" placeholder="Describe the reseller product"></textarea></label>
+            <label class="field"><span>Currency</span><select name="currency"><option value="ZAR">ZAR (South African rand)</option></select></label>
+            <label class="field"><span>Sort order</span><input name="sort_order" type="number" min="0" step="1" value="0"></label>
+            <label class="field"><span>Stock quantity</span><input name="stock_quantity" type="number" min="0" step="1" inputmode="numeric" value="0"></label>
+            <label class="field"><span><input name="track_stock" type="checkbox" checked> Track stock</span></label>
+          </div>
+        </fieldset>
+        <fieldset class="settings-group"><legend>Customer price and profit sharing</legend>
+          <p class="muted">The customer price must equal the reseller share plus the M.H.R. company share. These settings are separate for each reseller product.</p>
+          <div class="settings-fields settings-fields-two">
+            <label class="field"><span>Customer price (R)</span><input name="customer_price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="250.00" required></label>
+            <label class="field"><span>Reseller share (R)</span><input name="reseller_share" type="number" min="0" step="0.01" inputmode="decimal" placeholder="150.00" required></label>
+            <label class="field"><span>M.H.R. share (R)</span><input name="company_share" type="number" min="0" step="0.01" inputmode="decimal" placeholder="100.00" required></label>
+            <label class="field"><span>Minimum order quantity</span><input name="minimum_order_quantity" type="number" min="1" step="1" value="1" required></label>
+          </div>
+          <p class="muted" data-pricing-check>Enter the customer price and both shares.</p>
+        </fieldset>
+        <div class="settings-actions"><span class="settings-load-status" data-product-status role="status">Ready to create a reseller product.</span><div><button class="button button-outline" type="button" data-product-cancel hidden>Cancel edit</button> <button class="button button-primary" type="submit" data-product-save>Save reseller product</button></div></div>
+      </form>
+    </section>
+    <section class="settings-panel" aria-labelledby="product-list-title">
+      <div class="settings-heading"><div><h2 id="product-list-title">Reseller products</h2><p class="muted">Edit products or change their status without affecting retail products.</p></div><button class="button button-outline" type="button" data-refresh>Refresh</button></div>
+      <div class="settings-notice" data-product-list-status role="status">Loading reseller products…</div>
+      <div class="admin-sections" data-product-list></div>
+    </section>
+  </div></main>
+  <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">MAHAYI HERBAL REMEDIES</a><p>© <span data-current-year>2026</span> MAHAYI HERBAL REMEDIES</p><a href="../">Back to dashboard</a></div></footer>
+<script type="module">
+const categoryForm=document.querySelector('[data-category-form]');
+const productForm=document.querySelector('[data-product-form]');
+const categoryList=document.querySelector('[data-category-list]');
+const productList=document.querySelector('[data-product-list]');
+const categoryStatus=document.querySelector('[data-category-status]');
+const productStatus=document.querySelector('[data-product-status]');
+const categoryListStatus=document.querySelector('[data-category-list-status]');
+const productListStatus=document.querySelector('[data-product-list-status]');
+const productHeading=document.querySelector('[data-product-heading]');
+const categorySave=document.querySelector('[data-category-save]');
+const productSave=document.querySelector('[data-product-save]');
+const categoryCancel=document.querySelector('[data-category-cancel]');
+const productCancel=document.querySelector('[data-product-cancel]');
+const pricingCheck=document.querySelector('[data-pricing-check]');
+let categories=[];
+let products=[];
+
+function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+async function apiFetch(url,options={}){
+  if(typeof window.getAdminIdToken!=='function')throw new Error('Admin authentication is still loading.');
+  const token=await window.getAdminIdToken();
+  const headers=new Headers(options.headers||{});
+  headers.set('Authorization','Bearer '+token);
+  if(options.body&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
+  const response=await fetch(url,{...options,headers,cache:'no-store'});
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok||!payload.success)throw new Error(payload.error||'Request failed.');
+  return payload;
+}
+function urlFor(resource,id){const u=new URL('/api/admin-reseller-catalog',window.location.origin);u.searchParams.set('resource',resource);if(id)u.searchParams.set('id',id);return u.toString();}
+function categoryOptions(selected=''){const select=productForm.elements.category_id;select.innerHTML='<option value="">Uncategorized</option>';for(const c of categories){const o=document.createElement('option');o.value=c.id;o.textContent=c.name+(Number(c.is_enabled)?'':' (disabled)');o.selected=String(c.id)===String(selected);select.append(o);}}
+async function loadAll(){
+ categoryListStatus.textContent='Loading reseller categories…';productListStatus.textContent='Loading reseller products…';
+ try{
+  const [c,p]=await Promise.all([apiFetch(urlFor('categories')),apiFetch(urlFor('products'))]);
+  categories=c.data.categories||[];products=p.data.products||[];
+  renderCategories();renderProducts();categoryOptions(productForm.elements.category_id.value);
+  categoryListStatus.textContent=categories.length?categories.length+' reseller categor'+(categories.length===1?'y':'ies')+' loaded.':'No reseller categories yet. Create one above.';
+  productListStatus.textContent=products.length?products.length+' reseller product'+(products.length===1?'':'s')+' loaded.':'No reseller products yet. Add the first one above.';
+ }catch(error){categoryListStatus.textContent=error.message;productListStatus.textContent=error.message;}
+}
+function renderCategories(){
+ categoryList.innerHTML='';
+ for(const c of categories){
+  const panel=document.createElement('section');panel.className='admin-panel';
+  panel.innerHTML='<div class="panel-icon">'+escapeHtml(String(c.sort_order).padStart(2,'0'))+'</div><div><h2>'+escapeHtml(c.name)+'</h2><p class="muted">/'+escapeHtml(c.slug)+' · '+(Number(c.is_enabled)?'Enabled':'Disabled')+'</p>'+(c.description?'<p class="muted">'+escapeHtml(c.description)+'</p>':'')+'</div><div><button class="button button-outline" type="button" data-category-edit="'+c.id+'">Edit</button> <button class="button button-outline" type="button" data-category-delete="'+c.id+'">Delete</button></div>';
+  categoryList.append(panel);
+ }
+}
+function renderProducts(){
+ productList.innerHTML='';
+ for(const p of products){
+  const panel=document.createElement('section');panel.className='admin-panel';
+  const price=p.customer_price==null?'Pricing not configured':'R'+Number(p.customer_price).toFixed(2)+' · Reseller R'+Number(p.reseller_share).toFixed(2)+' · M.H.R. R'+Number(p.company_share).toFixed(2);
+  panel.innerHTML='<div class="panel-icon">'+escapeHtml(String(p.sort_order).padStart(2,'0'))+'</div><div><h2>'+escapeHtml(p.name)+'</h2><p class="muted">'+escapeHtml(p.category_name||'Uncategorized')+' · '+escapeHtml(p.status)+' · Stock '+escapeHtml(p.track_stock?'tracked':'not tracked')+' ('+escapeHtml(p.stock_quantity)+')</p><p class="muted">'+escapeHtml(price)+'</p>'+(p.description?'<p class="muted">'+escapeHtml(p.description)+'</p>':'')+'</div><div><button class="button button-outline" type="button" data-product-edit="'+p.id+'">Edit</button> <button class="button button-outline" type="button" data-product-delete="'+p.id+'">Delete</button></div>';
+  productList.append(panel);
+ }
+}
+function resetCategory(){categoryForm.reset();categoryForm.elements.id.value='';categoryForm.elements.sort_order.value='0';categoryForm.elements.is_enabled.value='1';categorySave.textContent='Save category';categoryCancel.hidden=true;categoryStatus.textContent='Ready.';}
+function resetProduct(){productForm.reset();productForm.elements.id.value='';productForm.elements.currency.value='ZAR';productForm.elements.status.value='draft';productForm.elements.sort_order.value='0';productForm.elements.stock_quantity.value='0';productForm.elements.track_stock.checked=true;productForm.elements.minimum_order_quantity.value='1';productHeading.textContent='Add reseller product';productSave.textContent='Save reseller product';productCancel.hidden=true;productStatus.textContent='Ready to create a reseller product.';pricingCheck.textContent='Enter the customer price and both shares.';categoryOptions();}
+categoryForm.addEventListener('submit',async event=>{
+ event.preventDefault();categorySave.disabled=true;categoryStatus.textContent='Saving category…';
+ const f=categoryForm.elements;const id=f.id.value;
+ const body={name:f.name.value,slug:f.slug.value,description:f.description.value,sort_order:Number(f.sort_order.value||0),is_enabled:f.is_enabled.value==='1'};
+ try{await apiFetch(urlFor('categories',id),{method:id?'PUT':'POST',body:JSON.stringify(body)});resetCategory();await loadAll();categoryStatus.textContent='Category saved.';}
+ catch(error){categoryStatus.textContent=error.message;}finally{categorySave.disabled=false;}
+});
+categoryCancel.addEventListener('click',resetCategory);
+categoryList.addEventListener('click',async event=>{
+ const edit=event.target.closest('[data-category-edit]');const del=event.target.closest('[data-category-delete]');
+ if(edit){const c=categories.find(x=>String(x.id)===edit.dataset.categoryEdit);if(!c)return;for(const key of ['id','name','slug','description','sort_order','is_enabled'])categoryForm.elements[key].value=c[key]??'';categorySave.textContent='Update category';categoryCancel.hidden=false;categoryStatus.textContent='Editing '+c.name+'.';categoryForm.scrollIntoView({behavior:'smooth',block:'start'});return;}
+ if(del){const c=categories.find(x=>String(x.id)===del.dataset.categoryDelete);if(!c||!confirm('Delete reseller category "'+c.name+'"? Products in it will become uncategorized.'))return;try{await apiFetch(urlFor('categories',c.id),{method:'DELETE'});await loadAll();categoryStatus.textContent='Category deleted.';}catch(error){categoryStatus.textContent=error.message;}}
+});
+function pricingNumbers(){return ['customer_price','reseller_share','company_share'].map(n=>Number(productForm.elements[n].value));}
+function checkPricing(){const vals=pricingNumbers();if(vals.some((v,i)=>!productForm.elements[['customer_price','reseller_share','company_share'][i]].value||!Number.isFinite(v)||v<0)){pricingCheck.textContent='Enter the customer price and both shares.';return false;}const valid=Math.abs(vals[0]-vals[1]-vals[2])<0.01;pricingCheck.textContent=valid?'Price split balances correctly.':'Customer price must equal reseller share plus M.H.R. share.';return valid;}
+['customer_price','reseller_share','company_share'].forEach(n=>productForm.elements[n].addEventListener('input',checkPricing));
+productForm.addEventListener('submit',async event=>{
+ event.preventDefault();if(!checkPricing()){productStatus.textContent='Please correct the price split before saving.';return;}
+ productSave.disabled=true;productStatus.textContent='Saving reseller product…';const f=productForm.elements;const id=f.id.value;
+ const body={name:f.name.value,sku:f.sku.value,category_id:f.category_id.value||null,status:f.status.value,description:f.description.value,currency:f.currency.value,sort_order:Number(f.sort_order.value||0),stock_quantity:Number(f.stock_quantity.value||0),track_stock:f.track_stock.checked,customer_price:Number(f.customer_price.value),reseller_share:Number(f.reseller_share.value),company_share:Number(f.company_share.value),minimum_order_quantity:Number(f.minimum_order_quantity.value||1)};
+ try{await apiFetch(urlFor('products',id),{method:id?'PUT':'POST',body:JSON.stringify(body)});resetProduct();await loadAll();productStatus.textContent='Reseller product saved.';}
+ catch(error){productStatus.textContent=error.message;}finally{productSave.disabled=false;}
+});
+productCancel.addEventListener('click',resetProduct);
+productList.addEventListener('click',async event=>{
+ const edit=event.target.closest('[data-product-edit]');const del=event.target.closest('[data-product-delete]');
+ if(edit){const p=products.find(x=>String(x.id)===edit.dataset.productEdit);if(!p)return;productForm.elements.id.value=p.id;for(const key of ['name','sku','status','description','currency','sort_order','stock_quantity','customer_price','reseller_share','company_share','minimum_order_quantity'])productForm.elements[key].value=p[key]??(key==='minimum_order_quantity'?1:'');productForm.elements.track_stock.checked=Number(p.track_stock)===1;categoryOptions(p.category_id??'');productHeading.textContent='Edit reseller product';productSave.textContent='Update reseller product';productCancel.hidden=false;productStatus.textContent='Editing '+p.name+'.';checkPricing();productForm.scrollIntoView({behavior:'smooth',block:'start'});return;}
+ if(del){const p=products.find(x=>String(x.id)===del.dataset.productDelete);if(!p||!confirm('Delete reseller product "'+p.name+'"? Historical order items will keep their saved product details.'))return;try{await apiFetch(urlFor('products',p.id),{method:'DELETE'});await loadAll();productStatus.textContent='Product deleted.';}catch(error){productStatus.textContent=error.message;}}
+});
+document.querySelector('[data-refresh]').addEventListener('click',loadAll);
+loadAll();
+</script>
+</body>
+</html>
