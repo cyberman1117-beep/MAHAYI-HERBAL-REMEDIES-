@@ -45,7 +45,8 @@ async function categories(request, env, method, id) {
   if (method === "PUT" && !id) return response({ success: false, error: "A valid category id is required." }, 400);
   if (method === "PUT" && !existing) return response({ success: false, error: "Reseller category not found." }, 404);
   const name = text(body.name, existing?.name);
-  const packageSlug = text(body.package_label, existing?.package_label);\n  const slug = slugify(body.slug || (packageSlug ? name + "-" + packageSlug : name) || existing?.slug);
+  const packageSlug = text(body.package_label, existing?.package_label);
+  const slug = slugify(body.slug || (packageSlug ? name + "-" + packageSlug : name) || existing?.slug);
   if (!name || !slug) return response({ success: false, error: "Category name is required." }, 400);
   const description = text(body.description, existing?.description);
   const imageUrl = text(body.image_url, existing?.image_url).slice(0, 2000);
