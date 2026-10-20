@@ -11,10 +11,7 @@
 <label class="field"><span>Account group</span><select id="account-status-filter"><option value="all" selected>All accounts (grouped by status)</option><option value="pending">Pending applications</option><option value="active">Approved / active</option><option value="suspended">Suspended</option><option value="rejected">Rejected</option></select></label>
 </div>
 <p id="list-status" class="settings-load-status" role="status">Loading reseller accounts…</p>
-<div class="settings-fields settings-fields-two" style="align-items:start">
-<div><h2 id="list-heading">Pending applications</h2><div id="account-list" class="admin-sections"></div></div>
-<div id="account-detail" aria-live="polite"><section class="settings-panel"><p class="muted">Select a reseller from the list to view and manage their profile.</p></section></div>
-</div>
+<div><h2 id="list-heading">Reseller accounts — grouped by status</h2><div id="account-list" class="admin-sections"></div></div>
 </section>
 </div></main><footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">MAHAYI HERBAL REMEDIES</a><p>© <span data-current-year>2026</span> MAHAYI HERBAL REMEDIES</p><a href="/admin/">Main admin</a></div></footer>
 <script type="module">
@@ -40,11 +37,9 @@ function renderList(){
   if(!rows.length)continue;
   if(group==='all'){const h=document.createElement('h3');h.textContent=names[state]+' ('+rows.length+')';h.style.margin='1rem 0 .5rem';list.append(h);}
   for(const a of rows){
-   const b=document.createElement('button');b.type='button';b.className='admin-panel';b.style.width='100%';b.style.textAlign='left';b.style.cursor='pointer';b.setAttribute('aria-pressed',String(Number(selectedId)===Number(a.id)));
-   if(Number(selectedId)===Number(a.id))b.style.border='2px solid var(--color-primary, #8b6b25)';
+   const b=document.createElement('a');b.className='admin-panel';b.style.width='100%';b.style.textAlign='left';b.style.textDecoration='none';b.href='/admin/resellers/accounts/profile/?id='+encodeURIComponent(a.id);b.setAttribute('aria-label','Manage '+(a.full_name||a.email||'reseller account'));
    const initials=String(a.full_name||a.email||'R').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase();
-   b.innerHTML='<div class="panel-icon">'+esc(initials)+'</div><div style="min-width:0"><h3>'+esc(a.full_name||'Unnamed applicant')+'</h3><p class="muted">'+esc(a.email||'No email')+'</p><p class="muted">'+esc(a.phone||'No phone')+'</p></div><span class="admin-status">'+esc(labelStatus(a.status))+'</span>';
-   b.addEventListener('click',()=>{selectedId=a.id;renderList();renderDetail(a);});
+   b.innerHTML='<div class="panel-icon">'+esc(initials)+'</div><div style="min-width:0"><h3>'+esc(a.full_name||'Unnamed applicant')+'</h3><p class="muted">'+esc(a.email||'No email')+'</p><p class="muted">'+esc(a.phone||'No phone')+'</p><p class="muted">Open profile and manage account →</p></div><span class="admin-status">'+esc(labelStatus(a.status))+'</span>';
    list.append(b);
   }
  }
