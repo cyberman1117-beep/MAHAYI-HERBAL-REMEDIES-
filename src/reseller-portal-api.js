@@ -75,30 +75,47 @@ export async function handleResellerPortal(request, env) {
       if (reseller.status !== "active") return json({ success: false, error: "Your reseller account must be approved before you can view the reseller catalogue." }, 403);
       const result = await env.DB.prepare(`
         SELECT p.id, p.category_id, c.name AS category_name, p.name, p.slug, p.description, p.sku, p.currency,
-               p.stock_quantity, p.track_stock, p.image_url, p.package_group, p.package_label,
-               pp.customer_price, pp.reseller_share, pp.company_share AS stock_unit_price, pp.minimum_order_quantity,
-               COALESCE(ri.quantity_available, 0) AS reseller_stock_quantity
+               p.image_url, p.package_group, p.status
         FROM reseller_products p
-        INNER JOIN reseller_product_pricing pp ON pp.reseller_product_id = p.id AND pp.is_enabled = 1
         LEFT JOIN reseller_categories c ON c.id = p.category_id
-        LEFT JOIN reseller_inventory ri ON ri.reseller_product_id = p.id AND ri.reseller_id = ?
         WHERE p.status = 'active' AND (p.category_id IS NULL OR c.is_enabled = 1)
+          AND EXISTS (SELECT 1 FROM reseller_product_packages pkg WHERE pkg.reseller_product_id = p.id AND pkg.is_enabled = 1)
         ORDER BY p.sort_order, p.name, p.id
+      `).all();
+      const packageResult = await env.DB.prepare(`
+        SELECT pkg.id AS package_id, pkg.reseller_product_id, pkg.package_label,
+               pkg.stock_amount AS stock_unit_price, pkg.resale_amount AS customer_price,
+               pkg.commission AS reseller_share, pkg.stock_quantity, pkg.minimum_order_quantity,
+               pkg.is_enabled, COALESCE(ri.quantity_available, 0) AS reseller_stock_quantity,
+               COALESCE(ri.pay_later_quantity, 0) AS pay_later_quantity
+        FROM reseller_product_packages pkg
+        JOIN reseller_products p ON p.id = pkg.reseller_product_id
+        LEFT JOIN reseller_package_inventory ri ON ri.package_id = pkg.id AND ri.reseller_id = ?
+        LEFT JOIN reseller_categories c ON c.id = p.category_id
+        WHERE pkg.is_enabled = 1 AND p.status = 'active' AND (p.category_id IS NULL OR c.is_enabled = 1)
+        ORDER BY p.sort_order, p.name, pkg.sort_order, pkg.id
       `).bind(reseller.id).all();
-      return json({ success: true, data: { products: result.results || [] } });
+      const byProduct = new Map();
+      for (const pkg of packageResult.results || []) {
+        if (!byProduct.has(pkg.reseller_product_id)) byProduct.set(pkg.reseller_product_id, []);
+        byProduct.get(pkg.reseller_product_id).push(pkg);
+      }
+      const products = (result.results || []).map((p) => ({ ...p, packages: byProduct.get(p.id) || [] }));
+      return json({ success: true, data: { products } });
     }
-
     if (action === "inventory") {
       const reseller = await getReseller(token, env);
       if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
       const result = await env.DB.prepare(`
-        SELECT i.reseller_product_id AS product_id, p.name, p.package_label, p.sku, p.currency, i.quantity_available, i.pay_later_quantity, i.updated_at
-        FROM reseller_inventory i JOIN reseller_products p ON p.id = i.reseller_product_id
-        WHERE i.reseller_id = ? ORDER BY p.name
+        SELECT ri.package_id, pkg.reseller_product_id AS product_id, p.name, pkg.package_label, p.sku, p.currency,
+               ri.quantity_available, ri.pay_later_quantity, ri.updated_at
+        FROM reseller_package_inventory ri
+        JOIN reseller_product_packages pkg ON pkg.id = ri.package_id
+        JOIN reseller_products p ON p.id = pkg.reseller_product_id
+        WHERE ri.reseller_id = ? ORDER BY p.name, pkg.sort_order, pkg.id
       `).bind(reseller.id).all();
       return json({ success: true, data: { inventory: result.results || [] } });
     }
-
     if (action === "stock-orders") {
       const reseller = await getReseller(token, env);
       if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
