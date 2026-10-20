@@ -48,6 +48,9 @@ async function categories(request, env, method, id) {
   const slug = slugify(body.slug || name || existing?.slug);
   if (!name || !slug) return response({ success: false, error: "Category name is required." }, 400);
   const description = text(body.description, existing?.description);
+  const imageUrl = text(body.image_url, existing?.image_url).slice(0, 2000);
+  const packageGroup = text(body.package_group, existing?.package_group).slice(0, 120);
+  const packageLabel = text(body.package_label, existing?.package_label).slice(0, 120);
   const sortOrder = integer(body.sort_order, existing?.sort_order || 0);
   const enabled = body.is_enabled === undefined ? (existing?.is_enabled ?? 1) : (body.is_enabled ? 1 : 0);
   if (method === "POST") {
@@ -60,7 +63,7 @@ async function categories(request, env, method, id) {
 
 async function products(request, env, method, id) {
   if (method === "GET") {
-    const result = await env.DB.prepare(`SELECT p.id, p.category_id, c.name AS category_name, p.name, p.slug, p.description, p.sku, p.currency, p.status, p.stock_quantity, p.track_stock, p.sort_order, p.created_at, p.updated_at, pp.customer_price, pp.reseller_share, pp.company_share, pp.minimum_order_quantity, pp.is_enabled AS pricing_enabled
+    const result = await env.DB.prepare(`SELECT p.id, p.category_id, c.name AS category_name, p.name, p.slug, p.description, p.sku, p.currency, p.status, p.stock_quantity, p.track_stock, p.sort_order, p.image_url, p.package_group, p.package_label, p.created_at, p.updated_at, pp.customer_price, pp.reseller_share, pp.company_share, pp.minimum_order_quantity, pp.is_enabled AS pricing_enabled
       FROM reseller_products p
       LEFT JOIN reseller_categories c ON c.id = p.category_id
       LEFT JOIN reseller_product_pricing pp ON pp.reseller_product_id = p.id
@@ -100,13 +103,14 @@ async function products(request, env, method, id) {
   let companyShare = body.company_share === undefined ? null : amount(body.company_share);
   const hasPricing = customerPrice !== null || resellerShare !== null || companyShare !== null ||
     body.customer_price !== undefined || body.reseller_share !== undefined || body.company_share !== undefined;
+  await env.DB.prepare("UPDATE reseller_products SET image_url = ?, package_group = ?, package_label = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(imageUrl, packageGroup, packageLabel, productId).run();
   if (hasPricing) {
     if (customerPrice === null || resellerShare === null || companyShare === null) return response({ success: false, error: "Enter a valid customer price, reseller share, and company share." }, 400);
     if (Math.abs(customerPrice - resellerShare - companyShare) >= 0.01) return response({ success: false, error: "Customer price must equal the reseller share plus the company share." }, 400);
   }
   let productId = id;
   if (method === "POST") {
-    const saved = await env.DB.prepare("INSERT INTO reseller_products (category_id, name, slug, description, sku, currency, status, stock_quantity, track_stock, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id").bind(categoryId, name, slug, description, sku, currency, status, stock, trackStock, sortOrder).first();
+    const saved = await env.DB.prepare("undefined").bind(categoryId, name, slug, description, sku, currency, status, stock, trackStock, sortOrder).first();
     productId = saved.id;
   } else {
     await env.DB.prepare("UPDATE reseller_products SET category_id = ?, name = ?, slug = ?, description = ?, sku = ?, currency = ?, status = ?, stock_quantity = ?, track_stock = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(categoryId, name, slug, description, sku, currency, status, stock, trackStock, sortOrder, productId).run();
