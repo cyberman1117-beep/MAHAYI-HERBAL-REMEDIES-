@@ -49,7 +49,7 @@ function renderList() {
   const query = $("#catalogue-search").value.trim().toLowerCase();
   const matching = products.filter((product) => [product.name, product.category_name, product.description, product.sku]
     .some((value) => String(value || "").toLowerCase().includes(query)));
-  const list = $("#catalogue-results"); list.replaceChildren();
+  const list = $("#catalogue-list"); list.replaceChildren();
   $("#catalogue-results-status").textContent = matching.length + " product" + (matching.length === 1 ? "" : "s") + " found.";
   for (const product of matching) {
     const card = document.createElement("article"); card.className = "admin-panel";
