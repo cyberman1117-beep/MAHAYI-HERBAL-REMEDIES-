@@ -171,7 +171,7 @@ function renderCart() {
     chosen.push({ product_id: id, quantity });
     const row = document.createElement("div"); row.className = "admin-panel";
     const details = document.createElement("div");
-    const title = document.createElement("h3"); title.textContent = p.name;
+    const title = document.createElement("h3"); title.textContent = p.name + (p.package_label ? " — " + p.package_label : "");
     const amount = document.createElement("p"); amount.className = "muted"; amount.textContent = quantity + " × " + money(p.stock_unit_price, p.currency) + " = " + money(Number(p.stock_unit_price) * quantity, p.currency);
     details.append(title, amount);
     const remove = document.createElement("button"); remove.className = "button button-outline"; remove.type = "button"; remove.textContent = "Remove"; remove.addEventListener("click", () => { cart.delete(id); renderCart(); });
@@ -194,7 +194,7 @@ function renderSaleCart() {
     chosen.push({ product_id: id, quantity });
     const row = document.createElement("div"); row.className = "admin-panel";
     const details = document.createElement("div");
-    const title = document.createElement("h3"); title.textContent = p.name;
+    const title = document.createElement("h3"); title.textContent = p.name + (p.package_label ? " — " + p.package_label : "");
     const amount = document.createElement("p"); amount.className = "muted"; amount.textContent = quantity + " × " + money(p.customer_price, p.currency) + " = " + money(Number(p.customer_price) * quantity, p.currency);
     details.append(title, amount);
     const remove = document.createElement("button"); remove.className = "button button-outline"; remove.type = "button"; remove.textContent = "Remove"; remove.addEventListener("click", () => { saleCart.delete(id); renderSaleCart(); });
@@ -223,7 +223,7 @@ async function loadInventoryAndOrders() {
     const list = $("#inventory-list"); list.replaceChildren();
     const items = inv.data?.inventory || [];
     $("#inventory-status").textContent = items.length ? items.length + " inventory product(s)." : "No stock has been released to your inventory yet.";
-    for (const item of items) list.append(makeCard(item.name, ["Available quantity: " + item.quantity_available, "SKU: " + (item.sku || "—"), "Last updated: " + item.updated_at]));
+    for (const item of items) list.append(makeCard(item.name + (item.package_label ? " — " + item.package_label : ""), ["Available quantity: " + item.quantity_available, "SKU: " + (item.sku || "—"), "Last updated: " + item.updated_at]));
   } catch (e) { $("#inventory-status").textContent = e.message; }
   try {
     const result = await api("stock-orders");
