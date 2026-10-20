@@ -31,6 +31,8 @@ function setMode(nextMode) {
   $("#auth-legend").textContent = profileOnly ? "Your contact details" : "Account details";
   nameField.hidden = !registering;
   phoneField.hidden = !registering;
+  form.elements.full_name.required = registering;
+  form.elements.phone.required = registering;
   emailField.closest(".field").hidden = profileOnly;
   passwordField.closest(".field").hidden = profileOnly;
   if (profileOnly) emailField.value = currentUser?.email || "";
@@ -292,7 +294,13 @@ form.addEventListener("submit", async (event) => {
     }
     await loadAccount();
   } catch (error) {
-    status.textContent = error?.code === "auth/email-already-in-use" ? "An account already exists with this email. Choose sign in instead." : error?.code === "auth/weak-password" ? "Choose a password with at least 6 characters." : error?.message || "Unable to continue. Please try again.";
+    if (mode === "register" && auth.currentUser) {
+      currentUser = auth.currentUser;
+      setMode("profile");
+      status.textContent = "Your login account was created, but the reseller application did not finish. Complete your details below to retry. " + (error?.message || "");
+    } else {
+      status.textContent = error?.code === "auth/email-already-in-use" ? "An account already exists with this email. Choose sign in instead." : error?.code === "auth/weak-password" ? "Choose a password with at least 6 characters." : error?.message || "Unable to continue. Please try again.";
+    }
   } finally { authFlowInProgress = false; submit.disabled = false; }
 });
 switchMode.addEventListener("click", () => setMode(mode === "register" ? "login" : "register"));
