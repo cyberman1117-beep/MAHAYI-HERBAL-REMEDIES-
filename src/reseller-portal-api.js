@@ -89,7 +89,7 @@ export async function handleResellerPortal(request, env) {
       const reseller = await getReseller(token, env);
       if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
       const result = await env.DB.prepare(`
-        SELECT i.reseller_product_id AS product_id, p.name, p.sku, p.currency, i.quantity_available, i.updated_at
+        SELECT i.reseller_product_id AS product_id, p.name, p.sku, p.currency, i.quantity_available, i.pay_later_quantity, i.updated_at
         FROM reseller_inventory i JOIN reseller_products p ON p.id = i.reseller_product_id
         WHERE i.reseller_id = ? ORDER BY p.name
       `).bind(reseller.id).all();
@@ -115,6 +115,8 @@ export async function handleResellerPortal(request, env) {
       }
       if (request.method !== "POST") return json({ success: false, error: "Method not allowed." }, 405);
       const body = await request.json();
+      const fulfilmentMode = body.fulfilment_mode === "pay_later" ? "pay_later" : "upfront";
+      if (fulfilmentMode === "pay_later" && Number(reseller.pay_later_enabled) !== 1) return json({ success: false, error: "Pay-later stock access has not been approved for your account." }, 403);
       if (!Array.isArray(body.items) || !body.items.length || body.items.length > 50) return json({ success: false, error: "Add at least one product to your stock order." }, 400);
       const quantities = new Map();
       for (const item of body.items) {
@@ -148,10 +150,10 @@ export async function handleResellerPortal(request, env) {
       }
       const orderNumber = "MHR-RS-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + crypto.randomUUID().slice(0,8).toUpperCase();
       const created = await env.DB.prepare(`
-        INSERT INTO reseller_stock_orders (order_number, reseller_id, currency, total_amount, payment_status, order_status, reseller_notes)
-        VALUES (?, ?, ?, ?, 'pending', 'submitted', ?)
+        INSERT INTO reseller_stock_orders (order_number, reseller_id, currency, total_amount, payment_status, order_status, fulfilment_mode, reseller_notes)
+        VALUES (?, ?, ?, ?, 'pending', 'submitted', ?, ?)
         RETURNING id
-      `).bind(orderNumber, reseller.id, currency, total, clean(body.reseller_notes, 2000)).first();
+      `).bind(orderNumber, reseller.id, currency, total, fulfilmentMode, clean(body.reseller_notes, 2000)).first();
       try {
         const statements = [];
         for (const item of orderItems) {
@@ -168,7 +170,21 @@ export async function handleResellerPortal(request, env) {
         await env.DB.prepare("DELETE FROM reseller_stock_orders WHERE id = ?").bind(created.id).run();
         throw error;
       }
-      return json({ success: true, data: { id: created.id, order_number: orderNumber, total_amount: total, currency, payment_status: "pending", order_status: "submitted" } }, 201);
+      return json({ success: true, data: { id: created.id, order_number: orderNumber, total_amount: total, currency, fulfilment_mode: fulfilmentMode, payment_status: "pending", order_status: "submitted" } }, 201);
+    }
+
+    if (action === "ledger") {
+      const reseller = await getReseller(token, env);
+      if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
+      const rows = await env.DB.prepare(`
+        SELECT id, movement_type, amount_debit, amount_credit, reference_type, reference_id, payment_reference, notes, created_at
+        FROM reseller_company_ledger WHERE reseller_id = ? ORDER BY created_at DESC, id DESC LIMIT 200
+      `).bind(reseller.id).all();
+      const balance = await env.DB.prepare(`
+        SELECT COALESCE(SUM(amount_debit) - SUM(amount_credit), 0) AS outstanding
+        FROM reseller_company_ledger WHERE reseller_id = ?
+      `).bind(reseller.id).first();
+      return json({ success: true, data: { outstanding: Number(balance?.outstanding || 0), entries: rows.results || [] } });
     }
 
     if (action === "sales") {
@@ -202,7 +218,7 @@ export async function handleResellerPortal(request, env) {
       for (const [productId, quantity] of quantities) {
         const product = await env.DB.prepare(`
           SELECT p.id, p.name, p.sku, p.currency, pp.customer_price, pp.reseller_share, pp.company_share,
-                 pp.minimum_order_quantity, i.quantity_available
+                 pp.minimum_order_quantity, i.quantity_available, i.pay_later_quantity
           FROM reseller_products p
           JOIN reseller_product_pricing pp ON pp.reseller_product_id = p.id AND pp.is_enabled = 1
           JOIN reseller_inventory i ON i.reseller_product_id = p.id AND i.reseller_id = ?
@@ -211,6 +227,7 @@ export async function handleResellerPortal(request, env) {
         if (!product) return json({ success: false, error: "A selected product is not currently available for sale from your inventory." }, 400);
 
         if (quantity > Number(product.quantity_available)) return json({ success: false, error: "Your inventory does not have enough " + product.name + " for this sale." }, 409);
+        const creditQuantity = Math.min(quantity, Number(product.pay_later_quantity || 0));
         currency = product.currency || "ZAR";
         const lineTotal = Math.round(Number(product.customer_price) * quantity * 100) / 100;
         const resellerLine = Math.round(Number(product.reseller_share) * quantity * 100) / 100;
@@ -218,7 +235,7 @@ export async function handleResellerPortal(request, env) {
         subtotal = Math.round((subtotal + lineTotal) * 100) / 100;
         resellerEarnings = Math.round((resellerEarnings + resellerLine) * 100) / 100;
         companyEarnings = Math.round((companyEarnings + companyLine) * 100) / 100;
-        saleItems.push({ product, productId, quantity, lineTotal, resellerLine, companyLine });
+        saleItems.push({ product, productId, quantity, creditQuantity, lineTotal, resellerLine, companyLine });
       }
       const paymentStatus = body.payment_status === "pending" ? "pending" : "paid";
       const customerName = clean(body.customer_full_name, 160);
@@ -235,9 +252,10 @@ export async function handleResellerPortal(request, env) {
         const statements = [];
         for (const item of saleItems) {
           statements.push(env.DB.prepare(`
-            UPDATE reseller_inventory SET quantity_available = quantity_available - ?, updated_at = CURRENT_TIMESTAMP
+            UPDATE reseller_inventory SET quantity_available = quantity_available - ?,
+              pay_later_quantity = pay_later_quantity - ?, updated_at = CURRENT_TIMESTAMP
             WHERE reseller_id = ? AND reseller_product_id = ?
-          `).bind(item.quantity, reseller.id, item.productId));
+          `).bind(item.quantity, item.creditQuantity, reseller.id, item.productId));
           statements.push(env.DB.prepare(`
             INSERT INTO reseller_order_items
               (reseller_order_id, reseller_product_id, product_name, product_sku, quantity, customer_unit_price,
@@ -251,6 +269,13 @@ export async function handleResellerPortal(request, env) {
               (reseller_id, reseller_product_id, movement_type, quantity_change, reference_type, reference_id, notes)
             VALUES (?, ?, 'sale', ?, 'reseller_sale', ?, ?)
           `).bind(reseller.id, item.productId, -item.quantity, created.id, "Customer sale " + orderNumber));
+          if (item.creditQuantity > 0) {
+            statements.push(env.DB.prepare(`
+              INSERT INTO reseller_company_ledger
+                (reseller_id, reseller_product_id, movement_type, amount_debit, reference_type, reference_id, notes)
+              VALUES (?, ?, 'stock_sold_on_credit', ?, 'reseller_sale', ?, ?)
+            `).bind(reseller.id, item.productId, Math.round(Number(item.product.company_share) * item.creditQuantity * 100) / 100, created.id, "Company share due from sale " + orderNumber));
+          }
         }
         await env.DB.batch(statements);
       } catch (error) {
