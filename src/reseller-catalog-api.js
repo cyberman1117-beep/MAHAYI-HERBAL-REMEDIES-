@@ -45,13 +45,9 @@ async function categories(request, env, method, id) {
   if (method === "PUT" && !id) return response({ success: false, error: "A valid category id is required." }, 400);
   if (method === "PUT" && !existing) return response({ success: false, error: "Reseller category not found." }, 404);
   const name = text(body.name, existing?.name);
-  const packageSlug = text(body.package_label, existing?.package_label);
-  const slug = slugify(body.slug || (packageSlug ? name + "-" + packageSlug : name) || existing?.slug);
+  const slug = slugify(body.slug || name || existing?.slug);
   if (!name || !slug) return response({ success: false, error: "Category name is required." }, 400);
   const description = text(body.description, existing?.description);
-  const imageUrl = text(body.image_url, existing?.image_url).slice(0, 2000);
-  const packageGroup = text(body.package_group, existing?.package_group).slice(0, 120);
-  const packageLabel = text(body.package_label, existing?.package_label).slice(0, 120);
   const sortOrder = integer(body.sort_order, existing?.sort_order || 0);
   const enabled = body.is_enabled === undefined ? (existing?.is_enabled ?? 1) : (body.is_enabled ? 1 : 0);
   if (method === "POST") {
@@ -68,7 +64,7 @@ async function products(request, env, method, id) {
       FROM reseller_products p
       LEFT JOIN reseller_categories c ON c.id = p.category_id
       LEFT JOIN reseller_product_pricing pp ON pp.reseller_product_id = p.id
-      ORDER BY p.sort_order, p.name, p.id`).all();
+      ORDER BY p.sort_order, p.name, p.package_group, p.package_label, p.id`).all();
     return response({ success: true, data: { products: result.results || [] } });
   }
   if (method === "DELETE") {
@@ -86,7 +82,8 @@ async function products(request, env, method, id) {
   if (method === "PUT" && !id) return response({ success: false, error: "A valid product id is required." }, 400);
   if (method === "PUT" && !existing) return response({ success: false, error: "Reseller product not found." }, 404);
   const name = text(body.name, existing?.name);
-  const slug = slugify(body.slug || name || existing?.slug);
+  const packageLabel = text(body.package_label, existing?.package_label);
+  const slug = slugify(body.slug || (packageLabel ? name + "-" + packageLabel : name) || existing?.slug);
   if (!name || !slug) return response({ success: false, error: "Product name is required." }, 400);
   const categoryId = body.category_id === "" || body.category_id === null ? null : (body.category_id === undefined ? existing?.category_id ?? null : positiveId(body.category_id));
   if (body.category_id && !categoryId) return response({ success: false, error: "Select a valid reseller category." }, 400);
@@ -96,6 +93,9 @@ async function products(request, env, method, id) {
   const currency = text(body.currency, existing?.currency || "ZAR").toUpperCase();
   const sku = text(body.sku, existing?.sku);
   const description = text(body.description, existing?.description);
+  const imageUrl = text(body.image_url, existing?.image_url).slice(0, 2000);
+  if (imageUrl && !/^https?:\/\//i.test(imageUrl)) return response({ success: false, error: "Product image must use a valid HTTP or HTTPS URL." }, 400);
+  const packageGroup = text(body.package_group, existing?.package_group).slice(0, 120);
   const stock = integer(body.stock_quantity, existing?.stock_quantity || 0);
   const trackStock = body.track_stock === undefined ? (existing?.track_stock ?? 1) : (body.track_stock ? 1 : 0);
   const sortOrder = integer(body.sort_order, existing?.sort_order || 0);
@@ -104,17 +104,18 @@ async function products(request, env, method, id) {
   let companyShare = body.company_share === undefined ? null : amount(body.company_share);
   const hasPricing = customerPrice !== null || resellerShare !== null || companyShare !== null ||
     body.customer_price !== undefined || body.reseller_share !== undefined || body.company_share !== undefined;
-  await env.DB.prepare("UPDATE reseller_products SET image_url = ?, package_group = ?, package_label = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(imageUrl, packageGroup, packageLabel, productId).run();
   if (hasPricing) {
     if (customerPrice === null || resellerShare === null || companyShare === null) return response({ success: false, error: "Enter a valid customer price, reseller share, and company share." }, 400);
     if (Math.abs(customerPrice - resellerShare - companyShare) >= 0.01) return response({ success: false, error: "Customer price must equal the reseller share plus the company share." }, 400);
   }
   let productId = id;
   if (method === "POST") {
-    const saved = await env.DB.prepare("undefined").bind(categoryId, name, slug, description, sku, currency, status, stock, trackStock, sortOrder).first();
+    const saved = await env.DB.prepare("INSERT INTO reseller_products (category_id, name, slug, description, sku, currency, status, stock_quantity, track_stock, sort_order, image_url, package_group, package_label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
+      .bind(categoryId, name, slug, description, sku, currency, status, stock, trackStock, sortOrder, imageUrl, packageGroup, packageLabel).first();
     productId = saved.id;
   } else {
-    await env.DB.prepare("UPDATE reseller_products SET category_id = ?, name = ?, slug = ?, description = ?, sku = ?, currency = ?, status = ?, stock_quantity = ?, track_stock = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(categoryId, name, slug, description, sku, currency, status, stock, trackStock, sortOrder, productId).run();
+    await env.DB.prepare("UPDATE reseller_products SET category_id = ?, name = ?, slug = ?, description = ?, sku = ?, currency = ?, status = ?, stock_quantity = ?, track_stock = ?, sort_order = ?, image_url = ?, package_group = ?, package_label = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .bind(categoryId, name, slug, description, sku, currency, status, stock, trackStock, sortOrder, imageUrl, packageGroup, packageLabel, productId).run();
   }
   if (hasPricing) {
     const minimum = integer(body.minimum_order_quantity, 1) || 1;
@@ -125,7 +126,6 @@ async function products(request, env, method, id) {
   }
   return response({ success: true, data: { id: productId } }, method === "POST" ? 201 : 200);
 }
-
 export async function handleAdminResellerCatalog(request, env) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...HEADERS, "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS", "Access-Control-Allow-Headers": "Authorization, Content-Type" } });
   try {
