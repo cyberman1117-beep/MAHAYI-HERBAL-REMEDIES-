@@ -57,7 +57,12 @@ async function stockOrders(request, env, id) {
       FROM reseller_stock_orders o JOIN resellers r ON r.id = o.reseller_id
       ORDER BY o.created_at DESC, o.id DESC
     `).all();
-    return json({ success: true, data: { orders: result.results || [] } });
+    const itemResult = await env.DB.prepare(`
+      SELECT i.reseller_stock_order_id, i.product_name, i.product_sku, i.quantity, i.wholesale_unit_price,
+             i.line_total, i.currency
+      FROM reseller_stock_order_items i ORDER BY i.reseller_stock_order_id DESC, i.id
+    `).all();
+    return json({ success: true, data: { orders: result.results || [], items: itemResult.results || [] } });
   }
   if (request.method !== "PUT" || !id) return json({ success: false, error: "Use PUT with a valid stock order id." }, 400);
   const body = await request.json();
