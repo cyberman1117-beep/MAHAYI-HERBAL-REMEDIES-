@@ -103,18 +103,39 @@ function renderRoute() {
   if (!image.hidden) { image.src = product.image_url; image.alt = product.name; }
   $("#detail-information").replaceChildren();
   addDetailLine("SKU", product.sku || "Not provided");
+  const imageUrl = product.image_url && /^https?:\/\//i.test(product.image_url) ? product.image_url : "";
   const table = document.createElement("table"); table.className = "data-table";
   const thead = document.createElement("thead"), header = document.createElement("tr");
-  for (const label of ["Package", "Stock amount", "Resale amount", "Your commission", "Stock available", "Your inventory"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; header.append(th); }
+  for (const label of ["Package", "Stock amount", "Resale amount", "Your commission", "M.H.R. stock", "Your stock", "Order quantity", "Action"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; header.append(th); }
   thead.append(header); table.append(thead);
   const tbody = document.createElement("tbody");
-  for (const pkg of (product.packages || []).filter((item) => Number(item.is_enabled) === 1)) {
+  const enabledPackages = (product.packages || []).filter((item) => Number(item.is_enabled) === 1);
+  for (const pkg of enabledPackages) {
     const row = document.createElement("tr");
-    for (const value of [pkg.package_label, money(pkg.stock_unit_price, product.currency), money(pkg.customer_price, product.currency), money(pkg.reseller_share, product.currency), String(pkg.stock_quantity), String(pkg.reseller_stock_quantity || 0)]) { const td = document.createElement("td"); td.textContent = value; row.append(td); }
-    tbody.append(row);
+    for (const value of [pkg.package_label || "Package", money(pkg.stock_unit_price, product.currency), money(pkg.customer_price, product.currency), money(pkg.reseller_share, product.currency), String(pkg.stock_quantity ?? 0), String(pkg.reseller_stock_quantity || 0)]) { const td = document.createElement("td"); td.textContent = value; row.append(td); }
+    const qtyCell = document.createElement("td");
+    const qty = document.createElement("input"); qty.type = "number"; qty.min = String(pkg.minimum_order_quantity || 1); qty.step = "1"; qty.value = String(pkg.minimum_order_quantity || 1); qty.style.width = "5.5rem"; qty.setAttribute("aria-label", "Order quantity for " + pkg.package_label); qtyCell.append(qty); row.append(qtyCell);
+    const actionCell = document.createElement("td");
+    const order = document.createElement("button"); order.type = "button"; order.className = "button button-primary"; order.textContent = "Order this package"; order.style.minWidth = "10rem";
+    const enoughStock = Number(pkg.stock_quantity) >= Number(pkg.minimum_order_quantity || 1);
+    if (!enoughStock) { order.disabled = true; order.textContent = "Currently unavailable"; qty.disabled = true; }
+    order.addEventListener("click", () => {
+      const quantity = Number(qty.value);
+      if (!Number.isSafeInteger(quantity) || quantity < Number(pkg.minimum_order_quantity || 1)) { qty.focus(); return; }
+      if (quantity > Number(pkg.stock_quantity)) { qty.focus(); order.textContent = "Not enough stock"; return; }
+      const destination = new URL("../index.html", location.href);
+      destination.searchParams.set("order_package", String(pkg.package_id || pkg.id));
+      destination.searchParams.set("quantity", String(quantity));
+      destination.hash = "stock-cart";
+      location.href = destination.href;
+    });
+    actionCell.append(order); row.append(actionCell); tbody.append(row);
   }
   table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
   $("#detail-information").append(wrap);
+  const instruction = document.createElement("p"); instruction.className = "settings-notice";
+  instruction.textContent = enabledPackages.length ? "Choose the package size, enter how many you want, then select “Order this package”. Your selection will be added to your stock order for review before you submit it." : "No package options are available for this product yet.";
+  $("#detail-information").append(instruction);
   $("#dashboard-product-link").href = "../index.html";
 }
 async function loadCatalogue() {
