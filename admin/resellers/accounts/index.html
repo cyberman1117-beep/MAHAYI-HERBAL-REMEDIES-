@@ -15,9 +15,9 @@
 </section>
 </div></main><footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">MAHAYI HERBAL REMEDIES</a><p>© <span data-current-year>2026</span> MAHAYI HERBAL REMEDIES</p><a href="/admin/">Main admin</a></div></footer>
 <script type="module">
-const list=document.querySelector('#account-list'),status=document.querySelector('#list-status'),detail=document.querySelector('#account-detail');
+const list=document.querySelector('#account-list'),status=document.querySelector('#list-status');
 const search=document.querySelector('#account-search'),filter=document.querySelector('#account-status-filter'),heading=document.querySelector('#list-heading');
-let accounts=[],selectedId=null;
+let accounts=[];
 async function api(resource,id,method='GET',body){if(typeof window.getAdminIdToken!=='function')throw Error('Admin authentication is still loading.');const token=await window.getAdminIdToken();const u=new URL('/api/admin-reseller-management',location.origin);u.searchParams.set('resource',resource);if(id)u.searchParams.set('id',id);const r=await fetch(u,{method,headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store'});const p=await r.json().catch(()=>({}));if(!r.ok||!p.success)throw Error(p.error||'Request failed.');return p;}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function labelStatus(s){return ({pending:'Pending approval',active:'Approved / active',suspended:'Suspended',rejected:'Rejected'})[s]||s||'Unknown';}
@@ -44,19 +44,11 @@ function renderList(){
   }
  }
 }
-function renderDetail(a){
- detail.replaceChildren();
- const card=document.createElement('section');card.className='settings-panel';
- card.innerHTML='<div class="settings-heading"><div><p class="eyebrow">Reseller profile</p><h2>'+esc(a.full_name||'Unnamed applicant')+'</h2><p class="muted">'+esc(a.email||'')+' · '+esc(a.phone||'')+'</p></div><span class="admin-status">'+esc(labelStatus(a.status))+'</span></div><p class="muted">Applied: '+esc(a.created_at||'Unknown')+'</p><form class="settings-form"><div class="settings-fields settings-fields-two"><label class="field"><span>Account status</span><select name="status"><option value="pending">Pending review</option><option value="active">Approved / active</option><option value="suspended">Suspended</option><option value="rejected">Rejected</option></select></label><label class="field"><span><input name="pay_later_enabled" type="checkbox"> Grant restricted pay-later distributor privilege</span><small class="muted">Available only for approved active resellers. Normal resellers purchase stock upfront.</small></label><label class="field field-wide"><span>Admin notes</span><textarea name="notes" rows="3" maxlength="4000"></textarea></label><label class="field field-wide"><span>Pay-later approval conditions / notes</span><textarea name="pay_later_notes" rows="3" maxlength="4000" placeholder="Record the conditions met and approved terms"></textarea></label></div><div class="settings-actions"><span class="settings-load-status" role="status">Changes are not saved yet.</span><button class="button button-primary" type="submit">Save account changes</button></div></form>';
- const f=card.querySelector('form');f.elements.status.value=a.status;f.elements.pay_later_enabled.checked=Number(a.pay_later_enabled)===1;f.elements.notes.value=a.notes||'';f.elements.pay_later_notes.value=a.pay_later_notes||'';
- f.elements.status.addEventListener('change',()=>{if(f.elements.status.value!=='active')f.elements.pay_later_enabled.checked=false;});
- f.addEventListener('submit',async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;const s=f.querySelector('[role=status]');s.textContent='Saving account changes…';try{await api('accounts',a.id,'PUT',{status:f.elements.status.value,pay_later_enabled:f.elements.pay_later_enabled.checked,notes:f.elements.notes.value,pay_later_notes:f.elements.pay_later_notes.value});s.textContent='Account saved.';selectedId=a.id;await load(false);}catch(err){s.textContent=err.message;}finally{b.disabled=false;}});
- detail.append(card);
-}
+
 async function load(showLoading=true){
  if(showLoading)status.textContent='Loading reseller accounts…';
- try{const p=await api('accounts');accounts=p.data.accounts||[];renderList();const selected=accounts.find(a=>Number(a.id)===Number(selectedId));if(selected)renderDetail(selected);else{selectedId=null;detail.innerHTML='<section class="settings-panel"><p class="muted">Select a reseller from the list to view and manage their profile.</p></section>';}}
+ try{const p=await api('accounts');accounts=p.data.accounts||[];renderList();}
  catch(e){status.textContent=e.message;}
 }
-search.addEventListener('input',renderList);filter.addEventListener('change',()=>{renderList();const selected=accounts.find(a=>Number(a.id)===Number(selectedId));if(!selected||!(filter.value==='all'||selected.status===filter.value)){selectedId=null;detail.innerHTML='<section class="settings-panel"><p class="muted">Select a reseller from the list to view and manage their profile.</p></section>';}});document.querySelector('#refresh').addEventListener('click',()=>load());load();
+search.addEventListener('input',renderList);filter.addEventListener('change',renderList);document.querySelector('#refresh').addEventListener('click',()=>load());load();
 </script></body></html>
