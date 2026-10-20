@@ -60,12 +60,28 @@ async function categories(request, env, method, id) {
 
 async function products(request, env, method, id) {
   if (method === "GET") {
-    const result = await env.DB.prepare(`SELECT p.id, p.category_id, c.name AS category_name, p.name, p.slug, p.description, p.sku, p.currency, p.status, p.stock_quantity, p.track_stock, p.sort_order, p.image_url, p.package_group, p.package_label, p.created_at, p.updated_at, pp.customer_price, pp.reseller_share, pp.company_share, pp.minimum_order_quantity, pp.is_enabled AS pricing_enabled
+    const result = await env.DB.prepare(`SELECT p.id, p.category_id, c.name AS category_name, p.name, p.slug, p.description, p.sku, p.currency, p.status, p.stock_quantity, p.track_stock, p.sort_order, p.image_url, p.package_group, p.package_label, p.created_at, p.updated_at
       FROM reseller_products p
       LEFT JOIN reseller_categories c ON c.id = p.category_id
-      LEFT JOIN reseller_product_pricing pp ON pp.reseller_product_id = p.id
-      ORDER BY p.sort_order, p.name, p.package_group, p.package_label, p.id`).all();
-    return response({ success: true, data: { products: result.results || [] } });
+      ORDER BY p.sort_order, p.name, p.id`).all();
+    const packages = await env.DB.prepare(`SELECT id, reseller_product_id, package_label, stock_amount, resale_amount, commission, stock_quantity, minimum_order_quantity, is_enabled, sort_order, created_at, updated_at
+      FROM reseller_product_packages ORDER BY reseller_product_id, sort_order, id`).all();
+    const byProduct = new Map();
+    for (const pkg of packages.results || []) {
+      if (!byProduct.has(pkg.reseller_product_id)) byProduct.set(pkg.reseller_product_id, []);
+      byProduct.get(pkg.reseller_product_id).push(pkg);
+    }
+    const products = (result.results || []).map((p) => {
+      const rows = byProduct.get(p.id) || [];
+      const first = rows.find((pkg) => Number(pkg.is_enabled) === 1) || rows[0];
+      return { ...p, packages: rows,
+        customer_price: first?.resale_amount ?? null,
+        reseller_share: first?.commission ?? null,
+        company_share: first?.stock_amount ?? null,
+        minimum_order_quantity: first?.minimum_order_quantity ?? 1,
+        pricing_enabled: first?.is_enabled ?? 0 };
+    });
+    return response({ success: true, data: { products } });
   }
   if (method === "DELETE") {
     if (!id) return response({ success: false, error: "A valid product id is required." }, 400);
@@ -82,8 +98,7 @@ async function products(request, env, method, id) {
   if (method === "PUT" && !id) return response({ success: false, error: "A valid product id is required." }, 400);
   if (method === "PUT" && !existing) return response({ success: false, error: "Reseller product not found." }, 404);
   const name = text(body.name, existing?.name);
-  const packageLabel = text(body.package_label, existing?.package_label);
-  const slug = slugify(body.slug || (packageLabel ? name + "-" + packageLabel : name) || existing?.slug);
+  const slug = slugify(body.slug || name || existing?.slug);
   if (!name || !slug) return response({ success: false, error: "Product name is required." }, 400);
   const categoryId = body.category_id === "" || body.category_id === null ? null : (body.category_id === undefined ? existing?.category_id ?? null : positiveId(body.category_id));
   if (body.category_id && !categoryId) return response({ success: false, error: "Select a valid reseller category." }, 400);
@@ -99,31 +114,56 @@ async function products(request, env, method, id) {
   const stock = integer(body.stock_quantity, existing?.stock_quantity || 0);
   const trackStock = body.track_stock === undefined ? (existing?.track_stock ?? 1) : (body.track_stock ? 1 : 0);
   const sortOrder = integer(body.sort_order, existing?.sort_order || 0);
-  let customerPrice = body.customer_price === undefined ? null : amount(body.customer_price);
-  let resellerShare = body.reseller_share === undefined ? null : amount(body.reseller_share);
-  let companyShare = body.company_share === undefined ? null : amount(body.company_share);
-  const hasPricing = customerPrice !== null || resellerShare !== null || companyShare !== null ||
-    body.customer_price !== undefined || body.reseller_share !== undefined || body.company_share !== undefined;
-  if (hasPricing) {
-    if (customerPrice === null || resellerShare === null || companyShare === null) return response({ success: false, error: "Enter a valid customer price, reseller share, and company share." }, 400);
-    if (Math.abs(customerPrice - resellerShare - companyShare) >= 0.01) return response({ success: false, error: "Customer price must equal the reseller share plus the company share." }, 400);
+  if (!Array.isArray(body.packages) || !body.packages.length || body.packages.length > 100) {
+    return response({ success: false, error: "Add at least one package row with its stock amount, resale amount, and commission." }, 400);
+  }
+  const packageRows = [];
+  for (let index = 0; index < body.packages.length; index++) {
+    const row = body.packages[index] || {};
+    const label = text(row.package_label);
+    const stockAmount = amount(row.stock_amount);
+    const resaleAmount = amount(row.resale_amount);
+    const commission = amount(row.commission);
+    if (!label || stockAmount === null || resaleAmount === null || commission === null) {
+      return response({ success: false, error: "Every package row needs a package name, stock amount, resale amount, and commission." }, 400);
+    }
+    if (Math.abs(resaleAmount - stockAmount - commission) >= 0.01) {
+      return response({ success: false, error: "Package " + label + ": resale amount must equal stock amount plus commission." }, 400);
+    }
+    const packageStock = integer(row.stock_quantity, 0);
+    const minimum = integer(row.minimum_order_quantity, 1) || 1;
+    packageRows.push({ id: positiveId(row.id), package_label: label, stock_amount: stockAmount, resale_amount: resaleAmount, commission, stock_quantity: packageStock, minimum_order_quantity: minimum, is_enabled: row.is_enabled === false || row.is_enabled === 0 ? 0 : 1, sort_order: integer(row.sort_order, index) });
   }
   let productId = id;
   if (method === "POST") {
     const saved = await env.DB.prepare("INSERT INTO reseller_products (category_id, name, slug, description, sku, currency, status, stock_quantity, track_stock, sort_order, image_url, package_group, package_label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
-      .bind(categoryId, name, slug, description, sku, currency, status, stock, trackStock, sortOrder, imageUrl, packageGroup, packageLabel).first();
+      .bind(categoryId, name, slug, description, sku, currency, status, stock, trackStock, sortOrder, imageUrl, packageGroup, packageRows[0].package_label).first();
     productId = saved.id;
   } else {
     await env.DB.prepare("UPDATE reseller_products SET category_id = ?, name = ?, slug = ?, description = ?, sku = ?, currency = ?, status = ?, stock_quantity = ?, track_stock = ?, sort_order = ?, image_url = ?, package_group = ?, package_label = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .bind(categoryId, name, slug, description, sku, currency, status, stock, trackStock, sortOrder, imageUrl, packageGroup, packageLabel, productId).run();
+      .bind(categoryId, name, slug, description, sku, currency, status, stock, trackStock, sortOrder, imageUrl, packageGroup, packageRows[0].package_label, productId).run();
   }
-  if (hasPricing) {
-    const minimum = integer(body.minimum_order_quantity, 1) || 1;
-    const pricingEnabled = body.pricing_enabled === undefined ? 1 : (body.pricing_enabled ? 1 : 0);
-    await env.DB.prepare(`INSERT INTO reseller_product_pricing (reseller_product_id, customer_price, reseller_share, company_share, minimum_order_quantity, is_enabled)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(reseller_product_id) DO UPDATE SET customer_price = excluded.customer_price, reseller_share = excluded.reseller_share, company_share = excluded.company_share, minimum_order_quantity = excluded.minimum_order_quantity, is_enabled = excluded.is_enabled, updated_at = CURRENT_TIMESTAMP`).bind(productId, customerPrice, resellerShare, companyShare, minimum, pricingEnabled).run();
+  const existingRows = await env.DB.prepare("SELECT id FROM reseller_product_packages WHERE reseller_product_id = ?").bind(productId).all();
+  const keepIds = new Set();
+  const statements = [];
+  for (const row of packageRows) {
+    if (row.id) {
+      const owns = (existingRows.results || []).some((x) => Number(x.id) === row.id);
+      if (!owns) return response({ success: false, error: "A package row does not belong to this product. Refresh and try again." }, 400);
+      keepIds.add(row.id);
+      statements.push(env.DB.prepare(`UPDATE reseller_product_packages SET package_label = ?, stock_amount = ?, resale_amount = ?, commission = ?, stock_quantity = ?, minimum_order_quantity = ?, is_enabled = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND reseller_product_id = ?`)
+        .bind(row.package_label, row.stock_amount, row.resale_amount, row.commission, row.stock_quantity, row.minimum_order_quantity, row.is_enabled, row.sort_order, row.id, productId));
+    } else {
+      statements.push(env.DB.prepare(`INSERT INTO reseller_product_packages (reseller_product_id, package_label, stock_amount, resale_amount, commission, stock_quantity, minimum_order_quantity, is_enabled, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(productId, row.package_label, row.stock_amount, row.resale_amount, row.commission, row.stock_quantity, row.minimum_order_quantity, row.is_enabled, row.sort_order));
+    }
   }
+  for (const row of existingRows.results || []) {
+    if (!keepIds.has(Number(row.id)) && !packageRows.some((pkg) => pkg.id === Number(row.id))) {
+      statements.push(env.DB.prepare("UPDATE reseller_product_packages SET is_enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(row.id));
+    }
+  }
+  if (statements.length) await env.DB.batch(statements);
   return response({ success: true, data: { id: productId } }, method === "POST" ? 201 : 200);
 }
 export async function handleAdminResellerCatalog(request, env) {
