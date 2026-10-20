@@ -104,7 +104,7 @@ export async function handleResellerPortal(request, env) {
       if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
       if (request.method === "GET") {
         const orders = await env.DB.prepare(`
-          SELECT id, order_number, currency, total_amount, payment_status, order_status, payment_reference,
+          SELECT id, order_number, currency, total_amount, payment_status, order_status, fulfilment_mode, payment_reference,
                  reseller_notes, created_at, updated_at
           FROM reseller_stock_orders WHERE reseller_id = ? ORDER BY created_at DESC, id DESC LIMIT 100
         `).bind(reseller.id).all();
