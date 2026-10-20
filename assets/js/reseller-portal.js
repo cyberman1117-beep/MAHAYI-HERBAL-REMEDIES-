@@ -16,6 +16,7 @@ const emailField = form.elements.email;
 const passwordField = form.elements.password;
 let mode = "login";
 let currentUser = null;
+let authFlowInProgress = false;
 let products = [];
 const cart = new Map();
 const saleCart = new Map();
@@ -231,41 +232,51 @@ async function loadAccount() {
   }
   $("[data-account-email]").textContent = currentUser.email || "Reseller account";
   $("[data-logout]").hidden = false;
+
+  let result;
   try {
-    const result = await api("me");
-    const reseller = result.data?.reseller;
-    if (!reseller) { setMode("profile"); return; }
-    if (reseller.status !== "active") {
-      showPanel("#pending-panel");
-      $("#pending-title").textContent = reseller.status === "rejected" ? "Your application was not approved" : reseller.status === "suspended" ? "Your reseller account is suspended" : "Your reseller application is under review";
-      $("#pending-message").textContent = reseller.status === "rejected" ? "Please contact M.H.R. if you believe this decision needs to be reviewed." : reseller.status === "suspended" ? "Reseller catalogue access is currently disabled. Contact M.H.R. for assistance." : "M.H.R. must approve your account before you can access reseller products. You can sign in here to check your status.";
-      return;
-    }
-    showPanel("#dashboard-panel");
-    $("#welcome-text").textContent = "Welcome, " + (reseller.full_name || "reseller") + ". Manage your M.H.R. reseller activity here.";
-    $("#account-details").textContent = (reseller.full_name || "") + " · " + reseller.email + " · " + (reseller.phone || "");
-    $("#pay-later-note").textContent = Number(reseller.pay_later_enabled) === 1 ? "M.H.R. has granted your account restricted distributor privileges. Standard upfront stock orders remain available here; arrange the approved pay-later stock issue and settlement terms directly with M.H.R." : "The standard buy-stock-first arrangement is active for your account. Receiving stock and paying later is restricted to distributors approved by M.H.R.";
-    $(".admin-status").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved distributor" : "Standard reseller";
-    $(".admin-stats .stat-card:nth-child(3) strong").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved" : "No access";
-    $(".admin-stats .stat-card:nth-child(3) small").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved for pay-later stock requests" : "Reserved for selected distributors";
-    $("#pay-later-option").hidden = Number(reseller.pay_later_enabled) !== 1;
-    $("#products-status").textContent = "Loading products…";
+    result = await api("me");
+  } catch (error) {
+    showPanel("#auth-panel");
+    setMode("login");
+    status.textContent = "We couldn't verify your reseller account. Your login is still active. Please retry in a moment. " + error.message;
+    return;
+  }
+
+  const reseller = result.data?.reseller;
+  if (!reseller) { setMode("profile"); return; }
+  if (reseller.status !== "active") {
+    showPanel("#pending-panel");
+    $("#pending-title").textContent = reseller.status === "rejected" ? "Your application was not approved" : reseller.status === "suspended" ? "Your reseller account is suspended" : "Your reseller application is under review";
+    $("#pending-message").textContent = reseller.status === "rejected" ? "Please contact M.H.R. if you believe this decision needs to be reviewed." : reseller.status === "suspended" ? "Reseller catalogue access is currently disabled. Contact M.H.R. for assistance." : "M.H.R. must approve your account before you can access reseller products. You can sign in here to check your status.";
+    return;
+  }
+
+  showPanel("#dashboard-panel");
+  $("#welcome-text").textContent = "Welcome, " + (reseller.full_name || "reseller") + ". Manage your M.H.R. reseller activity here.";
+  $("#account-details").textContent = (reseller.full_name || "") + " · " + reseller.email + " · " + (reseller.phone || "");
+  $("#pay-later-note").textContent = Number(reseller.pay_later_enabled) === 1 ? "M.H.R. has granted your account restricted distributor privileges. Standard upfront stock orders remain available here; arrange the approved pay-later stock issue and settlement terms directly with M.H.R." : "The standard buy-stock-first arrangement is active for your account. Receiving stock and paying later is restricted to distributors approved by M.H.R.";
+  $(".admin-status").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved distributor" : "Standard reseller";
+  $(".admin-stats .stat-card:nth-child(3) strong").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved" : "No access";
+  $(".admin-stats .stat-card:nth-child(3) small").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved for pay-later stock requests" : "Reserved for selected distributors";
+  $("#pay-later-option").hidden = Number(reseller.pay_later_enabled) !== 1;
+  $("#products-status").textContent = "Loading products…";
+  try {
     const productData = await api("products");
     renderProducts(productData.data?.products || []);
     renderCart();
     renderSaleCart();
-    await loadInventoryAndOrders();
-    await loadSales();
-    await loadLedger();
   } catch (error) {
-    showPanel("#auth-panel");
-    setMode("login");
-    status.textContent = error.message;
+    $("#products-status").textContent = "Your account is signed in, but the catalogue could not load: " + error.message;
   }
+  await loadInventoryAndOrders();
+  await loadSales();
+  await loadLedger();
 }
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   submit.disabled = true;
+  authFlowInProgress = true;
   try {
     if (mode === "register") {
       await createUserWithEmailAndPassword(auth, emailField.value.trim(), passwordField.value);
@@ -282,7 +293,7 @@ form.addEventListener("submit", async (event) => {
     await loadAccount();
   } catch (error) {
     status.textContent = error?.code === "auth/email-already-in-use" ? "An account already exists with this email. Choose sign in instead." : error?.code === "auth/weak-password" ? "Choose a password with at least 6 characters." : error?.message || "Unable to continue. Please try again.";
-  } finally { submit.disabled = false; }
+  } finally { authFlowInProgress = false; submit.disabled = false; }
 });
 switchMode.addEventListener("click", () => setMode(mode === "register" ? "login" : "register"));
 $("[data-logout]").addEventListener("click", async () => { await signOut(auth); setMode("login"); });
@@ -318,4 +329,4 @@ $("#place-order").addEventListener("click", async () => {
   } catch (error) { $("#cart-status").textContent = error.message; }
   finally { button.disabled = cart.size === 0; }
 });
-onAuthStateChanged(auth, () => loadAccount());
+onAuthStateChanged(auth, () => { if (!authFlowInProgress) loadAccount(); });
