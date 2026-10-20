@@ -75,8 +75,8 @@ export async function handleResellerPortal(request, env) {
       if (reseller.status !== "active") return json({ success: false, error: "Your reseller account must be approved before you can view the reseller catalogue." }, 403);
       const result = await env.DB.prepare(`
         SELECT p.id, p.category_id, c.name AS category_name, p.name, p.slug, p.description, p.sku, p.currency,
-               p.stock_quantity, p.track_stock, pp.customer_price, pp.reseller_share,
-               pp.company_share AS stock_unit_price, pp.minimum_order_quantity,
+               p.stock_quantity, p.track_stock, p.image_url, p.package_group, p.package_label,
+               pp.customer_price, pp.reseller_share, pp.company_share AS stock_unit_price, pp.minimum_order_quantity,
                COALESCE(ri.quantity_available, 0) AS reseller_stock_quantity
         FROM reseller_products p
         INNER JOIN reseller_product_pricing pp ON pp.reseller_product_id = p.id AND pp.is_enabled = 1
@@ -92,7 +92,7 @@ export async function handleResellerPortal(request, env) {
       const reseller = await getReseller(token, env);
       if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
       const result = await env.DB.prepare(`
-        SELECT i.reseller_product_id AS product_id, p.name, p.sku, p.currency, i.quantity_available, i.pay_later_quantity, i.updated_at
+        SELECT i.reseller_product_id AS product_id, p.name, p.package_label, p.sku, p.currency, i.quantity_available, i.pay_later_quantity, i.updated_at
         FROM reseller_inventory i JOIN reseller_products p ON p.id = i.reseller_product_id
         WHERE i.reseller_id = ? ORDER BY p.name
       `).bind(reseller.id).all();
@@ -133,7 +133,7 @@ export async function handleResellerPortal(request, env) {
       let currency = "ZAR";
       for (const [productId, quantity] of quantities) {
         const product = await env.DB.prepare(`
-          SELECT p.id, p.name, p.sku, p.currency, p.stock_quantity, p.track_stock,
+          SELECT p.id, p.name, p.package_label, p.sku, p.currency, p.stock_quantity, p.track_stock,
                  pp.customer_price, pp.reseller_share, pp.company_share, pp.minimum_order_quantity
           FROM reseller_products p JOIN reseller_product_pricing pp ON pp.reseller_product_id = p.id
           LEFT JOIN reseller_categories c ON c.id = p.category_id
@@ -165,7 +165,7 @@ export async function handleResellerPortal(request, env) {
             INSERT INTO reseller_stock_order_items
               (reseller_stock_order_id, reseller_product_id, product_name, product_sku, quantity, wholesale_unit_price, customer_unit_price, reseller_unit_share, line_total, currency)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(created.id, item.productId, item.product.name, item.product.sku || "", item.quantity, item.wholesale, item.customerPrice, item.resellerShare, item.lineTotal, item.product.currency || "ZAR"));
+          `).bind(created.id, item.productId, (item.product.package_label ? item.product.name + " — " + item.product.package_label : item.product.name), item.product.sku || "", item.quantity, item.wholesale, item.customerPrice, item.resellerShare, item.lineTotal, item.product.currency || "ZAR"));
         }
         statements.push(env.DB.prepare("UPDATE reseller_stock_orders SET stock_reserved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(created.id));
         await env.DB.batch(statements);
@@ -220,7 +220,7 @@ export async function handleResellerPortal(request, env) {
       let subtotal = 0, resellerEarnings = 0, companyEarnings = 0, currency = "ZAR";
       for (const [productId, quantity] of quantities) {
         const product = await env.DB.prepare(`
-          SELECT p.id, p.name, p.sku, p.currency, pp.customer_price, pp.reseller_share, pp.company_share,
+          SELECT p.id, p.name, p.package_label, p.sku, p.currency, pp.customer_price, pp.reseller_share, pp.company_share,
                  pp.minimum_order_quantity, i.quantity_available, i.pay_later_quantity
           FROM reseller_products p
           JOIN reseller_product_pricing pp ON pp.reseller_product_id = p.id AND pp.is_enabled = 1
@@ -264,7 +264,7 @@ export async function handleResellerPortal(request, env) {
               (reseller_order_id, reseller_product_id, product_name, product_sku, quantity, customer_unit_price,
                reseller_unit_share, company_unit_share, line_total, reseller_line_earnings, company_line_earnings, currency)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(created.id, item.productId, item.product.name, item.product.sku || "", item.quantity,
+          `).bind(created.id, item.productId, (item.product.package_label ? item.product.name + " — " + item.product.package_label : item.product.name), item.product.sku || "", item.quantity,
             Number(item.product.customer_price), Number(item.product.reseller_share), Number(item.product.company_share),
             item.lineTotal, item.resellerLine, item.companyLine, item.product.currency || "ZAR"));
           statements.push(env.DB.prepare(`
