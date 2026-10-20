@@ -77,102 +77,88 @@ function makeCard(titleText, lines = []) {
   card.append(marker, details);
   return card;
 }
+function findPackage(packageId) {
+  for (const product of products) {
+    const pkg = (product.packages || []).find((item) => Number(item.package_id || item.id) === Number(packageId));
+    if (pkg) return { product, pkg };
+  }
+  return null;
+}
 function renderProducts(data) {
   products = data;
   const list = $("#product-list");
   list.replaceChildren();
-  if (!products.length) {
-    $("#products-status").textContent = "No active, priced reseller products are available yet. Please check again later.";
+  const available = products.filter((p) => (p.packages || []).some((pkg) => Number(pkg.is_enabled) === 1));
+  if (!available.length) {
+    $("#products-status").textContent = "No distributor products are available yet. Please check again later.";
     return;
   }
-  const groups = new Map();
-  for (const product of products) {
-    const key = product.package_group ? "group:" + product.package_group : "product:" + product.id;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(product);
-  }
-  $("#products-status").textContent = groups.size + " reseller product" + (groups.size === 1 ? "" : " groups") + " available.";
-  for (const options of groups.values()) {
-    const first = options[0];
-    const card = document.createElement("article");
-    card.className = "admin-panel";
-    const marker = document.createElement("div");
-    marker.className = "panel-icon";
-    marker.textContent = "M.H.R.";
+  $("#products-status").textContent = available.length + " distributor product" + (available.length === 1 ? "" : "s") + " available.";
+  for (const product of available) {
+    const card = document.createElement("article"); card.className = "admin-panel";
+    const marker = document.createElement("div"); marker.className = "panel-icon"; marker.textContent = "M.H.R.";
     const details = document.createElement("div");
-    const title = document.createElement("h2"); title.textContent = first.name;
-    const category = document.createElement("p"); category.className = "muted"; category.textContent = first.category_name || "Reseller product";
-    const description = document.createElement("p"); description.className = "muted"; description.textContent = first.description || "Quality product supplied by M.H.R.";
+    const title = document.createElement("h2"); title.textContent = product.name;
+    const category = document.createElement("p"); category.className = "muted"; category.textContent = product.category_name || "Distributor product";
+    const description = document.createElement("p"); description.className = "muted"; description.textContent = product.description || "Choose the package that suits your budget.";
     details.append(title, category, description);
-    if (first.image_url && /^https:\/\//i.test(first.image_url)) {
-      const image = document.createElement("img");
-      image.src = first.image_url; image.alt = first.name; image.loading = "lazy";
-      image.style.width = "min(100%, 280px)"; image.style.height = "auto"; image.style.objectFit = "contain"; image.style.borderRadius = ".75rem";
-      details.prepend(image);
+    if (product.image_url && /^https?:\/\//i.test(product.image_url)) {
+      const image = document.createElement("img"); image.src = product.image_url; image.alt = product.name; image.loading = "lazy";
+      image.style.width = "min(100%, 280px)"; image.style.height = "auto"; image.style.objectFit = "contain"; image.style.borderRadius = ".75rem"; details.prepend(image);
     }
-    const table = document.createElement("table");
-    table.className = "data-table";
-    const thead = document.createElement("thead"), headerRow = document.createElement("tr");
-    for (const label of ["Package", "Customer price", "Your earnings", "M.H.R. stock price", "Quantity", "Actions"]) {
-      const th = document.createElement("th"); th.scope = "col"; th.textContent = label; headerRow.append(th);
-    }
-    thead.append(headerRow); table.append(thead);
+    const table = document.createElement("table"); table.className = "data-table";
+    const thead = document.createElement("thead"), tr = document.createElement("tr");
+    for (const label of ["Package", "Stock amount", "Resale amount", "Your commission", "Stock available", "Quantity", "Choose"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; tr.append(th); }
+    thead.append(tr); table.append(thead);
     const tbody = document.createElement("tbody");
-    for (const product of options) {
+    for (const pkg of (product.packages || []).filter((item) => Number(item.is_enabled) === 1)) {
       const row = document.createElement("tr");
-      const packageCell = document.createElement("td"); packageCell.textContent = product.package_label || "Standard";
-      const priceCell = document.createElement("td"); priceCell.textContent = money(product.customer_price, product.currency);
-      const shareCell = document.createElement("td"); shareCell.textContent = money(product.reseller_share, product.currency);
-      const companyCell = document.createElement("td"); companyCell.textContent = money(product.stock_unit_price, product.currency);
-      const qtyCell = document.createElement("td");
-      const qty = document.createElement("input"); qty.type = "number"; qty.min = String(product.minimum_order_quantity || 1); qty.step = "1"; qty.value = String(product.minimum_order_quantity || 1); qty.setAttribute("aria-label", "Quantity for " + product.name + " " + (product.package_label || ""));
-      qty.style.width = "6rem";
-      if (Number(product.track_stock) === 1) qty.max = String(product.stock_quantity);
+      const label = document.createElement("td"); label.textContent = pkg.package_label || "Package";
+      const stockAmount = document.createElement("td"); stockAmount.textContent = money(pkg.stock_unit_price, product.currency);
+      const resale = document.createElement("td"); resale.textContent = money(pkg.customer_price, product.currency);
+      const commission = document.createElement("td"); commission.textContent = money(pkg.reseller_share, product.currency);
+      const stock = document.createElement("td"); stock.textContent = String(pkg.stock_quantity);
+      const qtyCell = document.createElement("td"); const qty = document.createElement("input"); qty.type = "number"; qty.min = String(pkg.minimum_order_quantity || 1); qty.step = "1"; qty.value = String(pkg.minimum_order_quantity || 1); qty.style.width = "5.5rem"; qty.setAttribute("aria-label", "Quantity of " + product.name + " " + pkg.package_label);
+      if (Number(pkg.stock_quantity) < Number(pkg.minimum_order_quantity || 1)) { qty.disabled = true; qty.value = "1"; }
       qtyCell.append(qty);
       const actions = document.createElement("td");
-      const add = document.createElement("button"); add.className = "button button-primary"; add.type = "button"; add.textContent = "Add stock";
-      if (Number(product.track_stock) === 1 && Number(product.stock_quantity) < Number(product.minimum_order_quantity)) { add.disabled = true; qty.disabled = true; add.textContent = "Out of stock"; }
+      const add = document.createElement("button"); add.className = "button button-primary"; add.type = "button"; add.textContent = "Order package";
+      if (Number(pkg.stock_quantity) < Number(pkg.minimum_order_quantity || 1)) { add.disabled = true; add.textContent = "Out of stock"; }
       add.addEventListener("click", () => {
-        const quantity = Number(qty.value), id = Number(product.id);
-        if (!Number.isSafeInteger(quantity) || quantity < Number(product.minimum_order_quantity || 1)) { $("#cart-status").textContent = "Enter a whole-number quantity that meets the minimum order."; return; }
-        if (Number(product.track_stock) === 1 && quantity + (cart.get(id) || 0) > Number(product.stock_quantity)) { $("#cart-status").textContent = "That total quantity is not currently available."; return; }
+        const quantity = Number(qty.value), id = Number(pkg.package_id);
+        if (!Number.isSafeInteger(quantity) || quantity < Number(pkg.minimum_order_quantity || 1)) { $("#cart-status").textContent = "Enter a whole-number quantity that meets this package’s minimum order."; return; }
+        if (quantity + (cart.get(id) || 0) > Number(pkg.stock_quantity)) { $("#cart-status").textContent = "That package quantity is not currently available."; return; }
         cart.set(id, (cart.get(id) || 0) + quantity); renderCart();
-        $("#cart-status").textContent = (product.package_label || product.name) + " added to your stock order.";
+        $("#cart-status").textContent = product.name + " (" + pkg.package_label + ") added to your stock order.";
       });
-      const addSale = document.createElement("button"); addSale.className = "button button-outline"; addSale.type = "button"; addSale.textContent = "Add sale";
-      addSale.style.marginTop = ".35rem";
-      if (Number(product.reseller_stock_quantity || 0) < 1) { addSale.disabled = true; addSale.textContent = "No stock"; }
+      const addSale = document.createElement("button"); addSale.className = "button button-outline"; addSale.type = "button"; addSale.textContent = "Record sale"; addSale.style.marginTop = ".35rem";
+      if (Number(pkg.reseller_stock_quantity || 0) < 1) { addSale.disabled = true; addSale.textContent = "No stock"; }
       addSale.addEventListener("click", () => {
-        const quantity = Number(qty.value), id = Number(product.id);
+        const quantity = Number(qty.value), id = Number(pkg.package_id);
         if (!Number.isSafeInteger(quantity) || quantity < 1) { $("#sale-cart-status").textContent = "Enter a whole-number quantity for the customer sale."; return; }
-        if (quantity + (saleCart.get(id) || 0) > Number(product.reseller_stock_quantity || 0)) { $("#sale-cart-status").textContent = "Your inventory does not have enough " + (product.package_label || product.name) + " for this sale."; return; }
+        if (quantity + (saleCart.get(id) || 0) > Number(pkg.reseller_stock_quantity || 0)) { $("#sale-cart-status").textContent = "Your inventory does not have enough " + product.name + " (" + pkg.package_label + ") for this sale."; return; }
         saleCart.set(id, (saleCart.get(id) || 0) + quantity); renderSaleCart();
-        $("#sale-cart-status").textContent = (product.package_label || product.name) + " added to the customer sale.";
+        $("#sale-cart-status").textContent = product.name + " (" + pkg.package_label + ") added to the customer sale.";
       });
       actions.append(add, document.createTextNode(" "), addSale);
-      row.append(packageCell, priceCell, shareCell, companyCell, qtyCell, actions);
-      tbody.append(row);
+      row.append(label, stockAmount, resale, commission, stock, qtyCell, actions); tbody.append(row);
     }
-    table.append(tbody);
-    const tableWrap = document.createElement("div"); tableWrap.style.overflowX = "auto"; tableWrap.append(table);
-    card.append(marker, details, tableWrap);
-    list.append(card);
+    table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
+    card.append(marker, details, wrap); list.append(card);
   }
 }
 function renderCart() {
-  const box = $("#cart-items");
-  box.replaceChildren();
-  let total = 0;
-  const chosen = [];
+  const box = $("#cart-items"); box.replaceChildren();
+  let total = 0; const chosen = [];
   for (const [id, quantity] of cart) {
-    const p = products.find(item => Number(item.id) === id);
-    if (!p) continue;
-    total += Number(p.stock_unit_price || 0) * quantity;
-    chosen.push({ product_id: id, quantity });
+    const found = findPackage(id); if (!found) continue;
+    const { product, pkg } = found;
+    total += Number(pkg.stock_unit_price || 0) * quantity;
+    chosen.push({ package_id: id, quantity });
     const row = document.createElement("div"); row.className = "admin-panel";
     const details = document.createElement("div");
-    const title = document.createElement("h3"); title.textContent = p.name + (p.package_label ? " — " + p.package_label : "");
-    const amount = document.createElement("p"); amount.className = "muted"; amount.textContent = quantity + " × " + money(p.stock_unit_price, p.currency) + " = " + money(Number(p.stock_unit_price) * quantity, p.currency);
+    const title = document.createElement("h3"); title.textContent = product.name + " — " + pkg.package_label;
+    const amount = document.createElement("p"); amount.className = "muted"; amount.textContent = quantity + " × " + money(pkg.stock_unit_price, product.currency) + " = " + money(Number(pkg.stock_unit_price) * quantity, product.currency);
     details.append(title, amount);
     const remove = document.createElement("button"); remove.className = "button button-outline"; remove.type = "button"; remove.textContent = "Remove"; remove.addEventListener("click", () => { cart.delete(id); renderCart(); });
     row.append(details, remove); box.append(row);
@@ -188,19 +174,19 @@ function renderSaleCart() {
   const box = $("#sale-cart-items"); box.replaceChildren();
   let total = 0; const chosen = [];
   for (const [id, quantity] of saleCart) {
-    const p = products.find(item => Number(item.id) === id);
-    if (!p) continue;
-    total += Number(p.customer_price || 0) * quantity;
-    chosen.push({ product_id: id, quantity });
+    const found = findPackage(id); if (!found) continue;
+    const { product, pkg } = found;
+    total += Number(pkg.customer_price || 0) * quantity;
+    chosen.push({ package_id: id, quantity });
     const row = document.createElement("div"); row.className = "admin-panel";
     const details = document.createElement("div");
-    const title = document.createElement("h3"); title.textContent = p.name + (p.package_label ? " — " + p.package_label : "");
-    const amount = document.createElement("p"); amount.className = "muted"; amount.textContent = quantity + " × " + money(p.customer_price, p.currency) + " = " + money(Number(p.customer_price) * quantity, p.currency);
+    const title = document.createElement("h3"); title.textContent = product.name + " — " + pkg.package_label;
+    const amount = document.createElement("p"); amount.className = "muted"; amount.textContent = quantity + " × " + money(pkg.customer_price, product.currency) + " = " + money(Number(pkg.customer_price) * quantity, product.currency);
     details.append(title, amount);
     const remove = document.createElement("button"); remove.className = "button button-outline"; remove.type = "button"; remove.textContent = "Remove"; remove.addEventListener("click", () => { saleCart.delete(id); renderSaleCart(); });
     row.append(details, remove); box.append(row);
   }
-  if (!chosen.length) { const p = document.createElement("p"); p.className = "muted"; p.textContent = "No products selected for a sale."; box.append(p); }
+  if (!chosen.length) { const p = document.createElement("p"); p.className = "muted"; p.textContent = "No packages selected for a sale."; box.append(p); }
   $("#sale-cart-total").textContent = "Customer sale total: " + money(total);
   $("#record-sale").disabled = !chosen.length;
   return chosen;
