@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "src/**"
+      - "assets/js/**"
       - "migrations/**"
       - "wrangler.toml"
       - ".github/workflows/worker-deploy.yml"
