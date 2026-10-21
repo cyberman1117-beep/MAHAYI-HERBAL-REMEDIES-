@@ -105,17 +105,27 @@ function renderProducts(data) {
   }
   $("#products-status").textContent = available.length + " distributor product" + (available.length === 1 ? "" : "s") + " available.";
   for (const product of available) {
-    const card = document.createElement("article"); card.className = "admin-panel";
-    const marker = document.createElement("div"); marker.className = "panel-icon"; marker.textContent = "M.H.R.";
-    const details = document.createElement("div");
+    const card = document.createElement("article"); card.className = "reseller-dashboard-product";
+    const marker = document.createElement("div"); marker.className = "reseller-dashboard-product-image";
+    const details = document.createElement("div"); details.className = "reseller-dashboard-product-details";
     const title = document.createElement("h2"); title.textContent = product.name;
     const category = document.createElement("p"); category.className = "muted"; category.textContent = product.category_name || "Distributor product";
     const description = document.createElement("p"); description.className = "muted"; description.textContent = product.description || "Choose the package that suits your budget.";
     details.append(title, category, description);
-    if (product.image_url && /^https?:\/\//i.test(product.image_url)) {
-      const image = document.createElement("img"); image.src = product.image_url; image.alt = product.name; image.loading = "lazy";
-      image.style.width = "min(100%, 280px)"; image.style.height = "auto"; image.style.objectFit = "contain"; image.style.borderRadius = ".75rem"; details.prepend(image);
+    const productImageUrl = product.image_url && /^https?:\/\//i.test(product.image_url) ? product.image_url : "";
+    if (productImageUrl) {
+      const image = document.createElement("img"); image.src = productImageUrl; image.alt = product.name; image.loading = "lazy";
+      marker.replaceChildren(image); marker.classList.add("has-image");
+    } else {
+      marker.textContent = "M.H.R.";
+      marker.classList.add("is-placeholder");
     }
+    const enabledPackages = (product.packages || []).filter((item) => Number(item.is_enabled) === 1);
+    const prices = enabledPackages.map((pkg) => Number(pkg.stock_unit_price || 0));
+    const priceLine = document.createElement("p"); priceLine.className = "reseller-dashboard-product-price";
+    const minPrice = prices.length ? Math.min(...prices) : 0; const maxPrice = prices.length ? Math.max(...prices) : 0;
+    priceLine.textContent = "Reseller cost per unit: " + (minPrice === maxPrice ? money(minPrice, product.currency) : money(minPrice, product.currency) + " – " + money(maxPrice, product.currency)) + " · " + enabledPackages.length + " package size" + (enabledPackages.length === 1 ? "" : "s");
+    details.append(priceLine);
     const table = document.createElement("table"); table.className = "data-table";
     const thead = document.createElement("thead"), tr = document.createElement("tr");
     for (const label of ["Stock package", "Units/package", "Cost per unit", "Selling price/unit", "Profit/unit", "Package cost", "Packages available", "Order packages", "Choose"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; tr.append(th); }
@@ -159,9 +169,13 @@ function renderProducts(data) {
       actions.append(add, document.createTextNode(" "), addSale, document.createElement("br"), chooseMixed);
       row.append(label, unitsCell, stockAmount, resale, commission, packageCost, stock, qtyCell, actions); tbody.append(row);
     }
-    table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
-    const mixedButton = document.createElement("button"); mixedButton.className = "button button-outline"; mixedButton.type = "button"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => openMixedBuilder(product.id));
-    card.append(marker, details, wrap, mixedButton); list.append(card);
+    table.append(tbody);
+    const options = document.createElement("details"); options.className = "reseller-dashboard-product-options";
+    const summary = document.createElement("summary"); summary.textContent = "Package options and actions";
+    const wrap = document.createElement("div"); wrap.className = "reseller-dashboard-package-table"; wrap.append(table);
+    options.append(summary, wrap);
+    const mixedButton = document.createElement("button"); mixedButton.className = "button button-outline reseller-dashboard-mixed-button"; mixedButton.type = "button"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => openMixedBuilder(product.id));
+    card.append(marker, details, options, mixedButton); list.append(card);
   }
 }
 function renderCart() {
