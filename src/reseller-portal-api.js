@@ -85,7 +85,7 @@ export async function handleResellerPortal(request, env) {
       const packageResult = await env.DB.prepare(`
         SELECT pkg.id AS package_id, pkg.reseller_product_id, pkg.package_label, pkg.units_per_package,
                pkg.stock_amount AS stock_unit_price, pkg.resale_amount AS customer_price,
-               pkg.commission AS reseller_share, pkg.stock_quantity, pkg.minimum_order_quantity,
+               pkg.commission AS reseller_share, pkg.stock_quantity, pkg.stock_units_available, pkg.minimum_order_quantity,
                pkg.is_enabled, COALESCE(ri.quantity_available, 0) AS reseller_stock_quantity,
                COALESCE(ri.pay_later_quantity, 0) AS pay_later_quantity
         FROM reseller_product_packages pkg
@@ -135,34 +135,40 @@ export async function handleResellerPortal(request, env) {
       }
       if (request.method !== "POST") return json({ success: false, error: "Method not allowed." }, 405);
       const body = await request.json();
+      const orderType = body.order_type === "mixed" ? "mixed" : "packages";
       const fulfilmentMode = body.fulfilment_mode === "pay_later" ? "pay_later" : "upfront";
       if (fulfilmentMode === "pay_later" && Number(reseller.pay_later_enabled) !== 1) return json({ success: false, error: "Pay-later stock access has not been approved for your account." }, 403);
-      if (!Array.isArray(body.items) || !body.items.length || body.items.length > 50) return json({ success: false, error: "Choose at least one package for your stock order." }, 400);
+      if (!Array.isArray(body.items) || !body.items.length || body.items.length > 50) return json({ success: false, error: "Choose at least one item for your stock order." }, 400);
       const quantities = new Map();
       for (const item of body.items) {
         const packageId = Number(item.package_id), quantity = Number(item.quantity);
         if (!Number.isSafeInteger(packageId) || packageId <= 0 || !Number.isSafeInteger(quantity) || quantity <= 0) return json({ success: false, error: "Each stock order row needs a package and whole-number quantity." }, 400);
         quantities.set(packageId, (quantities.get(packageId) || 0) + quantity);
       }
+      if (orderType === "mixed" && [...quantities.values()].reduce((sum, quantity) => sum + quantity, 0) < 10) return json({ success: false, error: "A mixed order must contain at least 10 individual units across all selected sizes." }, 400);
       const orderItems = [];
       let total = 0;
       let currency = "ZAR";
       for (const [packageId, quantity] of quantities) {
         const pkg = await env.DB.prepare(`
           SELECT pkg.id AS package_id, pkg.reseller_product_id AS product_id, pkg.package_label, pkg.units_per_package, pkg.stock_amount, pkg.resale_amount, pkg.commission,
-                 pkg.stock_quantity, pkg.minimum_order_quantity, p.name, p.sku, p.currency
+                 pkg.stock_quantity, pkg.stock_units_available, pkg.minimum_order_quantity, p.name, p.sku, p.currency
           FROM reseller_product_packages pkg JOIN reseller_products p ON p.id = pkg.reseller_product_id
           LEFT JOIN reseller_categories c ON c.id = p.category_id
           WHERE pkg.id = ? AND pkg.is_enabled = 1 AND p.status = 'active' AND (p.category_id IS NULL OR c.is_enabled = 1)
         `).bind(packageId).first();
         if (!pkg) return json({ success: false, error: "One selected package is no longer available." }, 400);
-        if (quantity < Number(pkg.minimum_order_quantity)) return json({ success: false, error: pkg.name + " (" + pkg.package_label + ") requires a minimum order of " + pkg.minimum_order_quantity + "." }, 400);
-        if (quantity > Number(pkg.stock_quantity)) return json({ success: false, error: "Not enough stock available for " + pkg.name + " (" + pkg.package_label + "). Please refresh the catalogue." }, 409);
+        const unitsPerPackage = Number(pkg.units_per_package || 1);
+        if (orderType === "packages" && quantity < Number(pkg.minimum_order_quantity)) return json({ success: false, error: pkg.name + " (" + pkg.package_label + ") requires a minimum order of " + pkg.minimum_order_quantity + " package(s)." }, 400);
+        const unitsNeeded = orderType === "mixed" ? quantity : quantity * unitsPerPackage;
+        const unitsAvailable = Number(pkg.stock_units_available ?? (Number(pkg.stock_quantity) * unitsPerPackage));
+        if (unitsNeeded > unitsAvailable || (orderType === "packages" && quantity > Number(pkg.stock_quantity))) return json({ success: false, error: "Not enough stock available for " + pkg.name + " (" + pkg.package_label + "). Please refresh the catalogue." }, 409);
         currency = pkg.currency || "ZAR";
         const wholesale = Number(pkg.stock_amount), customerPrice = Number(pkg.resale_amount), resellerShare = Number(pkg.commission);
-        const lineTotal = Math.round(wholesale * Number(pkg.units_per_package || 1) * quantity * 100) / 100;
+        const itemUnitsPerPackage = orderType === "mixed" ? 1 : unitsPerPackage;
+        const lineTotal = Math.round(wholesale * itemUnitsPerPackage * quantity * 100) / 100;
         total = Math.round((total + lineTotal) * 100) / 100;
-        orderItems.push({ pkg, packageId, productId: Number(pkg.product_id), quantity, wholesale, customerPrice, resellerShare, lineTotal });
+        orderItems.push({ pkg, packageId, productId: Number(pkg.product_id), quantity, unitsNeeded, itemUnitsPerPackage, wholesale, customerPrice, resellerShare, lineTotal });
       }
       const orderNumber = "MHR-RS-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + crypto.randomUUID().slice(0,8).toUpperCase();
       const created = await env.DB.prepare(`
@@ -173,12 +179,16 @@ export async function handleResellerPortal(request, env) {
       try {
         const statements = [];
         for (const item of orderItems) {
-          statements.push(env.DB.prepare("UPDATE reseller_product_packages SET stock_quantity = stock_quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stock_quantity >= ?").bind(item.quantity, item.packageId, item.quantity));
+          if (orderType === "mixed") {
+            statements.push(env.DB.prepare("UPDATE reseller_product_packages SET stock_units_available = stock_units_available - ?, stock_quantity = CAST((stock_units_available - ?) / units_per_package AS INTEGER), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stock_units_available >= ?").bind(item.unitsNeeded, item.unitsNeeded, item.packageId, item.unitsNeeded));
+          } else {
+            statements.push(env.DB.prepare("UPDATE reseller_product_packages SET stock_quantity = stock_quantity - ?, stock_units_available = stock_units_available - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stock_quantity >= ? AND stock_units_available >= ?").bind(item.quantity, item.unitsNeeded, item.packageId, item.quantity, item.unitsNeeded));
+          }
           statements.push(env.DB.prepare(`
             INSERT INTO reseller_stock_order_items
               (reseller_stock_order_id, reseller_product_id, package_id, package_label, product_name, product_sku, quantity, wholesale_unit_price, customer_unit_price, reseller_unit_share, line_total, currency, units_per_package)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(created.id, item.productId, item.packageId, item.pkg.package_label, item.pkg.name + " — " + item.pkg.package_label, item.pkg.sku || "", item.quantity, item.wholesale, item.customerPrice, item.resellerShare, item.lineTotal, item.pkg.currency || "ZAR", Number(item.pkg.units_per_package || 1)));
+          `).bind(created.id, item.productId, item.packageId, item.pkg.package_label, item.pkg.name + " — " + item.pkg.package_label, item.pkg.sku || "", item.quantity, item.wholesale, item.customerPrice, item.resellerShare, item.lineTotal, item.pkg.currency || "ZAR", item.itemUnitsPerPackage));
         }
         statements.push(env.DB.prepare("UPDATE reseller_stock_orders SET stock_reserved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(created.id));
         await env.DB.batch(statements);
@@ -186,7 +196,7 @@ export async function handleResellerPortal(request, env) {
         await env.DB.prepare("DELETE FROM reseller_stock_orders WHERE id = ?").bind(created.id).run();
         throw error;
       }
-      return json({ success: true, data: { id: created.id, order_number: orderNumber, total_amount: total, currency, fulfilment_mode: fulfilmentMode, payment_status: "pending", order_status: "submitted" } }, 201);
+      return json({ success: true, data: { id: created.id, order_number: orderNumber, order_type: orderType, total_amount: total, currency, fulfilment_mode: fulfilmentMode, payment_status: "pending", order_status: "submitted" } }, 201);
     }
     if (action === "ledger") {
       const reseller = await getReseller(token, env);
