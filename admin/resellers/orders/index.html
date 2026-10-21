@@ -58,7 +58,7 @@ body.order-panel-visible{overflow:hidden}
 .order-detail-page .order-metrics,.order-detail-page .settings-panel,.order-detail-page .orders-table-wrap,.order-detail-page #table-count{display:none}
 .order-detail-page .settings-heading{margin-bottom:22px}
 .order-detail-page .settings-heading .button{display:inline-flex}
-.order-detail-page .order-detail-panel{position:relative;inset:auto;width:100%;max-width:none;height:auto;max-height:none;overflow:visible;transform:none;opacity:1;pointer-events:auto;box-shadow:none;border:1px solid var(--color-border);border-radius:16px;padding:0 0 18px;margin:0 0 28px}
+.order-detail-page .order-detail-panel{transition:none;position:relative;inset:auto;width:100%;max-width:none;height:auto;max-height:none;overflow:visible;transform:none;opacity:1;pointer-events:auto;box-shadow:none;border:1px solid var(--color-border);border-radius:16px;padding:0 0 18px;margin:0 0 28px}
 .order-detail-page .order-detail-panel.is-open{transform:none}
 .order-detail-page .order-panel-head{position:static}
 .order-detail-page .order-panel-body{padding:22px 24px}
@@ -226,6 +226,7 @@ body.order-panel-visible{overflow:hidden}
 </style>
 </head>
 <body class="admin-page">
+<script>/* Identify standalone order URLs before the drawer can animate into view. */if(new URLSearchParams(location.search).has("order"))document.body.classList.add("order-detail-page");</script>
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">MAHAYI HERBAL REMEDIES <span class="admin-label">Admin</span></a><div class="admin-account"><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
 <main id="main" class="admin-main"><div class="container">
