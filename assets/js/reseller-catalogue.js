@@ -72,7 +72,8 @@ function renderList() {
     }
     table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
     const button = document.createElement("button"); button.className = "button button-primary"; button.type = "button"; button.textContent = "View product"; button.addEventListener("click", () => openProduct(product));
-    card.append(marker, details, wrap, button); list.append(card);
+    const mixedButton = document.createElement("button"); mixedButton.className = "button button-outline"; mixedButton.type = "button"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => { const destination = new URL("../index.html", location.href); destination.searchParams.set("mixed_product", String(product.id)); destination.hash = "stock-cart"; location.href = destination.href; });
+    card.append(marker, details, wrap, button, mixedButton); list.append(card);
   }
 }
 function renderRoute() {
@@ -110,6 +111,8 @@ function renderRoute() {
   thead.append(header); table.append(thead);
   const tbody = document.createElement("tbody");
   const enabledPackages = (product.packages || []).filter((item) => Number(item.is_enabled) === 1);
+  const mixedButton = document.createElement("button"); mixedButton.type = "button"; mixedButton.className = "button button-outline"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => { const destination = new URL("../index.html", location.href); destination.searchParams.set("mixed_product", String(product.id)); destination.hash = "stock-cart"; location.href = destination.href; });
+  $("#detail-information").append(mixedButton);
   for (const pkg of enabledPackages) {
     const row = document.createElement("tr");
     for (const value of [pkg.package_label || "Package", String(pkg.units_per_package || 1), money(pkg.stock_unit_price, product.currency), money(pkg.customer_price, product.currency), money(pkg.reseller_share, product.currency), money(Number(pkg.stock_unit_price) * Number(pkg.units_per_package || 1), product.currency), String(pkg.stock_quantity ?? 0), String(pkg.reseller_stock_quantity || 0)]) { const td = document.createElement("td"); td.textContent = value; row.append(td); }
@@ -134,7 +137,7 @@ function renderRoute() {
   table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
   $("#detail-information").append(wrap);
   const instruction = document.createElement("p"); instruction.className = "settings-notice";
-  instruction.textContent = enabledPackages.length ? "Choose a stock package, enter how many packages to buy, then select “Order this package”. The amount payable is per-unit stock cost × units per package × number of packages ordered." : "No package options are available for this product yet.";
+  instruction.textContent = enabledPackages.length ? "Choose a stock package to add it to your cart, or select “Choose individual units” to build a mixed-size order. All orders go through your cart and checkout." : "No package options are available for this product yet.";
   $("#detail-information").append(instruction);
   $("#dashboard-product-link").href = "../index.html";
 }
