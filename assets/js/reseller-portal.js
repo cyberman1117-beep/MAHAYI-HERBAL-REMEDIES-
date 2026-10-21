@@ -122,15 +122,18 @@ function renderProducts(data) {
     }
     const table = document.createElement("table"); table.className = "data-table";
     const thead = document.createElement("thead"), tr = document.createElement("tr");
-    for (const label of ["Package", "Stock amount", "Resale amount", "Your commission", "Stock available", "Quantity", "Choose"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; tr.append(th); }
+    for (const label of ["Stock package", "Units/package", "Cost per unit", "Selling price/unit", "Profit/unit", "Package cost", "Packages available", "Order packages", "Choose"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; tr.append(th); }
     thead.append(tr); table.append(thead);
     const tbody = document.createElement("tbody");
     for (const pkg of (product.packages || []).filter((item) => Number(item.is_enabled) === 1)) {
       const row = document.createElement("tr");
       const label = document.createElement("td"); label.textContent = pkg.package_label || "Package";
+      const units = Number(pkg.units_per_package || 1);
+      const unitsCell = document.createElement("td"); unitsCell.textContent = String(units);
       const stockAmount = document.createElement("td"); stockAmount.textContent = money(pkg.stock_unit_price, product.currency);
       const resale = document.createElement("td"); resale.textContent = money(pkg.customer_price, product.currency);
       const commission = document.createElement("td"); commission.textContent = money(pkg.reseller_share, product.currency);
+      const packageCost = document.createElement("td"); packageCost.textContent = money(Number(pkg.stock_unit_price) * units, product.currency);
       const stock = document.createElement("td"); stock.textContent = String(pkg.stock_quantity);
       const qtyCell = document.createElement("td"); const qty = document.createElement("input"); qty.type = "number"; qty.min = String(pkg.minimum_order_quantity || 1); qty.step = "1"; qty.value = String(pkg.minimum_order_quantity || 1); qty.style.width = "5.5rem"; qty.setAttribute("aria-label", "Quantity of " + product.name + " " + pkg.package_label);
       if (Number(pkg.stock_quantity) < Number(pkg.minimum_order_quantity || 1)) { qty.disabled = true; qty.value = "1"; }
@@ -155,7 +158,7 @@ function renderProducts(data) {
         $("#sale-cart-status").textContent = product.name + " (" + pkg.package_label + ") added to the customer sale.";
       });
       actions.append(add, document.createTextNode(" "), addSale);
-      row.append(label, stockAmount, resale, commission, stock, qtyCell, actions); tbody.append(row);
+      row.append(label, unitsCell, stockAmount, resale, commission, packageCost, stock, qtyCell, actions); tbody.append(row);
     }
     table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
     card.append(marker, details, wrap); list.append(card);
@@ -167,12 +170,12 @@ function renderCart() {
   for (const [id, quantity] of cart) {
     const found = findPackage(id); if (!found) continue;
     const { product, pkg } = found;
-    total += Number(pkg.stock_unit_price || 0) * quantity;
+    total += Number(pkg.stock_unit_price || 0) * Number(pkg.units_per_package || 1) * quantity;
     chosen.push({ package_id: id, quantity });
     const row = document.createElement("div"); row.className = "admin-panel";
     const details = document.createElement("div");
     const title = document.createElement("h3"); title.textContent = product.name + " — " + pkg.package_label;
-    const amount = document.createElement("p"); amount.className = "muted"; amount.textContent = quantity + " × " + money(pkg.stock_unit_price, product.currency) + " = " + money(Number(pkg.stock_unit_price) * quantity, product.currency);
+    const amount = document.createElement("p"); amount.className = "muted"; amount.textContent = quantity + " stock package(s) × " + Number(pkg.units_per_package || 1) + " unit(s) each = " + (quantity * Number(pkg.units_per_package || 1)) + " units; total to M.H.R.: " + money(Number(pkg.stock_unit_price) * Number(pkg.units_per_package || 1) * quantity, product.currency);
     details.append(title, amount);
     const remove = document.createElement("button"); remove.className = "button button-outline"; remove.type = "button"; remove.textContent = "Remove"; remove.addEventListener("click", () => { cart.delete(id); renderCart(); });
     row.append(details, remove); box.append(row);
