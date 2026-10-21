@@ -88,19 +88,13 @@ function findPackage(packageId) {
 }
 function renderProducts(data) {
   products = data;
-  const requestedPackage = new URL(location.href).searchParams.get("order_package");
-  const requestedQuantity = Number(new URL(location.href).searchParams.get("quantity") || 1);
+  const routeUrl = new URL(location.href);
+  const requestedPackage = routeUrl.searchParams.get("order_package");
   if (requestedPackage) {
-    const requested = findPackage(requestedPackage);
-    if (requested && Number.isSafeInteger(requestedQuantity) && requestedQuantity >= Number(requested.pkg.minimum_order_quantity || 1)
-      && requestedQuantity <= Number(requested.pkg.stock_quantity)) {
-      cart.set(Number(requested.pkg.package_id || requested.pkg.id), requestedQuantity);
-      const cleanUrl = new URL(location.href); cleanUrl.searchParams.delete("order_package"); cleanUrl.searchParams.delete("quantity"); history.replaceState({}, "", cleanUrl);
-      $("#cart-status").textContent = requested.product.name + " (" + requested.pkg.package_label + ") is ready in your stock order. Review the total below, then place your order.";
-      setTimeout(() => $("#stock-cart").scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    } else {
-      $("#cart-status").textContent = "That package selection could not be added. Please check stock and quantity, then try again.";
-    }
+    const cartUrl = new URL("cart/", location.href);
+    cartUrl.search = routeUrl.search;
+    location.replace(cartUrl.href);
+    return;
   }
   const list = $("#product-list");
   list.replaceChildren();
@@ -147,9 +141,10 @@ function renderProducts(data) {
         const quantity = Number(qty.value), id = Number(pkg.package_id);
         if (!Number.isSafeInteger(quantity) || quantity < Number(pkg.minimum_order_quantity || 1)) { $("#cart-status").textContent = "Enter a whole-number quantity that meets this package’s minimum order."; return; }
         if (quantity + (cart.get(id) || 0) > Number(pkg.stock_quantity)) { $("#cart-status").textContent = "That package quantity is not currently available."; return; }
-        cart.set(id, (cart.get(id) || 0) + quantity); renderCart();
-        $("#cart-status").textContent = product.name + " (" + pkg.package_label + ") added to your cart. Review it below, then continue to checkout.";
-        $("#stock-cart").scrollIntoView({ behavior: "smooth", block: "start" });
+        let saved = {}; try { saved = JSON.parse(localStorage.getItem("mhr_reseller_package_cart") || "{}"); } catch {}
+        saved[id] = Number(saved[id] || 0) + quantity;
+        localStorage.setItem("mhr_reseller_package_cart", JSON.stringify(saved));
+        const cartUrl = new URL("cart/", location.href); cartUrl.searchParams.set("added", "1"); location.href = cartUrl.href;
       });
       const addSale = document.createElement("button"); addSale.className = "button button-outline"; addSale.type = "button"; addSale.textContent = "Record sale"; addSale.style.marginTop = ".35rem";
       if (Number(pkg.reseller_stock_quantity || 0) < 1) { addSale.disabled = true; addSale.textContent = "No stock"; }
@@ -317,11 +312,9 @@ async function loadAccount() {
   try {
     const productData = await api("products");
     renderProducts(productData.data?.products || []);
-    renderCart();
-    renderMixedCart();
     renderSaleCart();
     const routeUrl = new URL(location.href); const mixedProduct = routeUrl.searchParams.get("mixed_product");
-    if (mixedProduct) { routeUrl.searchParams.delete("mixed_product"); history.replaceState({}, "", routeUrl); openMixedBuilder(mixedProduct); }
+    if (mixedProduct) { const cartUrl = new URL("cart/", location.href); cartUrl.searchParams.set("mixed_product", mixedProduct); location.replace(cartUrl.href); return; }
   } catch (error) {
     $("#products-status").textContent = "Your account is signed in, but the catalogue could not load: " + error.message;
   }
@@ -377,78 +370,8 @@ $("#record-sale").addEventListener("click", async () => {
 $("#refresh-inventory").addEventListener("click", loadInventoryAndOrders);
 $("#refresh-orders").addEventListener("click", loadInventoryAndOrders);
 function openMixedBuilder(productId) {
-  const options = $("#mixed-builder-product-options"); options.replaceChildren();
-  const requestedProduct = productId == null ? null : products.find((item) => Number(item.id) === Number(productId));
-  const eligible = products.filter((product) => (!requestedProduct || Number(product.id) === Number(requestedProduct.id)) && (product.packages || []).some((pkg) => Number(pkg.is_enabled) === 1 && Number(pkg.stock_units_available ?? (Number(pkg.stock_quantity) * Number(pkg.units_per_package || 1))) > 0));
-  for (const product of eligible) {
-    const section = document.createElement("section"); section.className = "admin-panel";
-    const heading = document.createElement("h3"); heading.textContent = product.name; section.append(heading);
-    if (product.image_url && /^https?:\/\//i.test(product.image_url)) { const image = document.createElement("img"); image.src = product.image_url; image.alt = product.name; image.loading = "lazy"; image.style.width = "min(100%, 140px)"; image.style.height = "auto"; section.append(image); }
-    for (const pkg of (product.packages || []).filter((item) => Number(item.is_enabled) === 1)) {
-      const available = Number(pkg.stock_units_available ?? (Number(pkg.stock_quantity) * Number(pkg.units_per_package || 1))); if (available < 1) continue;
-      const row = document.createElement("div"); row.className = "settings-fields settings-fields-two"; row.style.alignItems = "end";
-      const label = document.createElement("label"); label.className = "field"; const text = document.createElement("span"); text.textContent = pkg.package_label + " · " + money(pkg.stock_unit_price, product.currency) + " per unit · " + available + " available"; label.append(text);
-      const qty = document.createElement("input"); qty.type = "number"; qty.min = "0"; qty.max = String(available); qty.step = "1"; qty.value = "0"; qty.dataset.packageId = String(pkg.package_id || pkg.id); qty.dataset.productId = String(product.id); qty.setAttribute("aria-label", "Individual units of " + product.name + " " + pkg.package_label); label.append(qty); row.append(label); section.append(row);
-    }
-    options.append(section);
-  }
-  $("#mixed-builder-status").textContent = eligible.length ? "Select individual units across the sizes you want. At least 10 units are required before checkout." : "No individual units are currently available for this selection.";
-  const dialog = $("#mixed-builder-dialog"); if (typeof dialog.showModal === "function") dialog.showModal(); else dialog.setAttribute("open", "");
+  const cartUrl = new URL("cart/", location.href);
+  if (productId != null) cartUrl.searchParams.set("mixed_product", String(productId));
+  location.href = cartUrl.href;
 }
-function startCheckout(type) {
-  checkoutType = type;
-  const items = type === "mixed" ? renderMixedCart() : renderCart();
-  const unitCount = items.reduce((sum, item) => sum + Number(item.quantity), 0);
-  if (!items.length) return;
-  if (type === "mixed" && unitCount < 10) { $("#mixed-cart-status").textContent = "A mixed order must contain at least 10 individual units across all selected sizes."; return; }
-  const summary = $("#checkout-summary"); summary.replaceChildren();
-  const heading = document.createElement("h3"); heading.textContent = type === "mixed" ? "Mixed individual-unit order" : "Full stock-package order"; summary.append(heading);
-  let total = 0;
-  for (const item of items) {
-    const found = findPackage(item.package_id); if (!found) continue;
-    const { product, pkg } = found; const units = type === "mixed" ? Number(item.quantity) : Number(item.quantity) * Number(pkg.units_per_package || 1);
-    const amount = Number(pkg.stock_unit_price || 0) * units; total += amount;
-    const line = document.createElement("p"); line.textContent = product.name + " — " + pkg.package_label + ": " + (type === "mixed" ? item.quantity + " individual unit(s)" : item.quantity + " package(s), " + units + " units") + " · " + money(amount, product.currency); summary.append(line);
-  }
-  $("#checkout-total").textContent = $("#pay-later-mode").checked ? "Company share due as stock sells: " + money(total) : "Total payable to M.H.R.: " + money(total);
-  $("#checkout-status").textContent = type === "mixed" ? "Mixed order minimum: 10 individual units. Check your quantities before confirming." : "Review your package quantities before confirming.";
-  $("#stock-checkout").hidden = false; $("#stock-checkout").scrollIntoView({ behavior: "smooth", block: "start" });
-}
-$("#open-mixed-builder").addEventListener("click", () => openMixedBuilder());
-$("#add-mixed-to-cart").addEventListener("click", () => {
-  const inputs = [...$("#mixed-builder-product-options").querySelectorAll("input[data-package-id]")];
-  const selections = []; let total = 0;
-  for (const input of inputs) {
-    const quantity = Number(input.value), id = Number(input.dataset.packageId);
-    if (!Number.isSafeInteger(quantity) || quantity < 0) { $("#mixed-builder-status").textContent = "Use whole numbers for individual units."; return; }
-    if (quantity > 0) { const found = findPackage(id); if (!found) continue; const available = Number(found.pkg.stock_units_available ?? (Number(found.pkg.stock_quantity) * Number(found.pkg.units_per_package || 1))); if (quantity + (mixedCart.get(id) || 0) > available) { $("#mixed-builder-status").textContent = "The selected quantity for " + found.pkg.package_label + " exceeds available stock."; return; } selections.push([id, quantity]); total += quantity; }
-  }
-  if (!total) { $("#mixed-builder-status").textContent = "Choose at least one individual unit to add to your cart."; return; }
-  for (const [id, quantity] of selections) mixedCart.set(id, (mixedCart.get(id) || 0) + quantity);
-  renderMixedCart(); $("#mixed-cart-status").textContent = total + " individual unit(s) added to your cart. Review your cart, then continue to checkout.";
-  $("#mixed-builder-dialog").close(); $("#stock-cart").scrollIntoView({ behavior: "smooth", block: "start" });
-});
-$("#checkout-packages").addEventListener("click", () => startCheckout("packages"));
-$("#checkout-mixed").addEventListener("click", () => startCheckout("mixed"));
-$("#back-to-cart").addEventListener("click", () => { $("#stock-checkout").hidden = true; $("#stock-cart").scrollIntoView({ behavior: "smooth", block: "start" }); });
-$("#pay-later-mode").addEventListener("change", () => { renderCart(); renderMixedCart(); if (!$("#stock-checkout").hidden) startCheckout(checkoutType); });
-$("#confirm-stock-order").addEventListener("click", async () => {
-  const items = checkoutType === "mixed" ? renderMixedCart() : renderCart();
-  const unitCount = items.reduce((sum, item) => sum + Number(item.quantity), 0);
-  if (!items.length || (checkoutType === "mixed" && unitCount < 10)) { $("#checkout-status").textContent = checkoutType === "mixed" ? "A mixed order must contain at least 10 individual units." : "Your package cart is empty."; return; }
-  const button = $("#confirm-stock-order"); button.disabled = true; $("#checkout-status").textContent = "Submitting your order…";
-  try {
-    const fulfilmentMode = $("#pay-later-mode").checked ? "pay_later" : "upfront";
-    const body = { items, fulfilment_mode: fulfilmentMode, reseller_notes: $("#order-note").value };
-    if (checkoutType === "mixed") body.order_type = "mixed";
-    const result = await api("stock-orders", "POST", body);
-    if (checkoutType === "mixed") { mixedCart.clear(); renderMixedCart(); $("#mixed-cart-status").textContent = "Mixed order submitted successfully."; }
-    else { cart.clear(); renderCart(); $("#cart-status").textContent = "Stock-package order submitted successfully."; }
-    $("#order-note").value = ""; $("#stock-checkout").hidden = true;
-    $("#checkout-status").textContent = (checkoutType === "mixed" ? "Mixed order " : "Order ") + result.data.order_number + " submitted. Total: " + money(result.data.total_amount, result.data.currency) + ". " + (fulfilmentMode === "pay_later" ? "M.H.R. must approve and release the stock." : "Please arrange payment with M.H.R.; stock is not released until payment is verified.");
-    $("#stock-cart").scrollIntoView({ behavior: "smooth", block: "start" });
-    await loadAccount();
-  } catch (error) { $("#checkout-status").textContent = error.message; }
-  finally { button.disabled = false; }
-});
 onAuthStateChanged(auth, () => { if (!authFlowInProgress) loadAccount(); });
