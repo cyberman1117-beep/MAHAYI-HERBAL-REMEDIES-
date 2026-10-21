@@ -12,7 +12,7 @@
   <a class="skip-link" href="#catalogue-main">Skip to content</a>
   <header class="admin-header"><div class="container header-inner">
     <a class="brand" href="../index.html">MAHAYI HERBAL REMEDIES <span class="admin-label">Reseller Catalogue</span></a>
-    <div class="admin-account"><span data-account-email></span><a class="button button-small button-outline" href="../index.html">Dashboard</a></div>
+    <div class="admin-account"><span data-account-email></span><a class="button button-small button-outline" id="catalogue-cart-link" href="../cart/">Cart (0)</a><a class="button button-small button-outline" href="../index.html">Dashboard</a></div>
   </div></header>
   <main id="catalogue-main" class="admin-main"><div class="container">
     <div class="settings-heading"><div><p class="eyebrow">M.H.R. reseller programme</p><h1 id="catalogue-title">Product Catalogue</h1><p class="muted" id="catalogue-intro">Browse available products and open any product to see its full reseller pricing and stock details.</p></div><a class="button button-outline" href="../index.html">Back to dashboard</a></div>
@@ -29,7 +29,9 @@
       <div class="admin-sections" id="detail-information"></div>
       <div class="settings-actions"><p class="muted">To add this item to a stock order or record a customer sale, return to your dashboard and use the existing order or sales controls.</p><a class="button button-primary" id="dashboard-product-link" href="../index.html">Go to dashboard</a></div>
     </section>
-  </div></main>
+  </div>
+    <dialog id="catalogue-mixed-builder-dialog" class="mixed-builder-dialog" aria-labelledby="catalogue-mixed-builder-title"><header class="mixed-builder-header"><div><p class="eyebrow">Build your stock order</p><h2 id="catalogue-mixed-builder-title">Choose individual units</h2><p class="muted">Choose sizes and quantities, add them to your cart, then continue shopping.</p></div><form method="dialog"><button class="button button-outline mixed-builder-close" aria-label="Close selector">Close</button></form></header><div class="mixed-builder-rule"><strong>Minimum order: 10 units</strong><span>Combined across your individual-unit selections at checkout.</span></div><div id="catalogue-mixed-builder-options" class="mixed-builder-options"></div><p id="catalogue-mixed-builder-status" class="settings-notice" role="status">Choose individual quantities.</p><footer class="mixed-builder-footer"><p id="catalogue-mixed-builder-summary" class="mixed-builder-summary">0 individual units selected · Estimated subtotal R0.00</p><button class="button button-primary" id="catalogue-add-mixed-to-cart" type="button" disabled>Add selected units to cart</button></footer></dialog>
+  </main>
   <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">MAHAYI HERBAL REMEDIES</a><p>© <span data-current-year>2026</span> MAHAYI HERBAL REMEDIES</p><a href="../../index.html">Main website</a></div></footer>
 </body>
 </html>
