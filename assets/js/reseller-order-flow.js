@@ -43,14 +43,39 @@ function openBuilder(productId){
  const box=$("#mixed-builder-options");box.replaceChildren();
  const selected=productId?products.filter(p=>Number(p.id)===Number(productId)):products;
  for(const product of selected){
-  const section=document.createElement("section");section.className="admin-panel";const h=document.createElement("h3");h.textContent=product.name;section.append(h);
-  for(const pkg of (product.packages||[]).filter(p=>Number(p.is_enabled)===1)){
-   const available=Number(pkg.stock_units_available??Number(pkg.stock_quantity)*Number(pkg.units_per_package||1));if(available<1)continue;
-   const label=document.createElement("label");label.className="field";const span=document.createElement("span");span.textContent=pkg.package_label+" · "+money(pkg.stock_unit_price,product.currency)+" per unit · "+available+" available";
-   const input=document.createElement("input");input.type="number";input.min="0";input.max=String(available);input.step="1";input.value=String(mixed.get(Number(pkg.package_id||pkg.id))||0);input.dataset.packageId=String(pkg.package_id||pkg.id);input.setAttribute("aria-label",product.name+" "+pkg.package_label+" individual units");label.append(span,input);section.append(label);
-  }box.append(section);
+  const availablePackages=(product.packages||[]).filter(p=>Number(p.is_enabled)===1&&Number(p.stock_units_available??Number(p.stock_quantity)*Number(p.units_per_package||1))>0);
+  const section=document.createElement("section");section.className="mixed-builder-product";
+  const heading=document.createElement("div");heading.className="mixed-builder-product-heading";
+  const h=document.createElement("h3");h.textContent=product.name;
+  const intro=document.createElement("p");intro.textContent="Choose the number of individual units for each size.";heading.append(h,intro);section.append(heading);
+  for(const pkg of availablePackages){
+   const id=Number(pkg.package_id||pkg.id);
+   const available=Number(pkg.stock_units_available??Number(pkg.stock_quantity)*Number(pkg.units_per_package||1));
+   const label=document.createElement("label");label.className="mixed-builder-option";
+   const info=document.createElement("span");info.className="mixed-builder-option-info";
+   const name=document.createElement("strong");name.className="mixed-builder-option-name";name.textContent=pkg.package_label;
+   const price=document.createElement("span");price.className="mixed-builder-option-price";price.textContent=money(pkg.stock_unit_price,product.currency)+" per unit";
+   const stock=document.createElement("span");stock.className="mixed-builder-option-stock";stock.textContent=available+" individual units available";
+   info.append(name,price,stock);
+   const quantity=document.createElement("span");quantity.className="mixed-builder-quantity-wrap";
+   const quantityLabel=document.createElement("span");quantityLabel.className="mixed-builder-quantity-label";quantityLabel.textContent="Quantity";
+   const input=document.createElement("input");input.className="mixed-builder-quantity";input.type="number";input.min="0";input.max=String(available);input.step="1";input.inputMode="numeric";input.value=String(mixed.get(id)||0);input.dataset.packageId=String(id);input.setAttribute("aria-label",product.name+" "+pkg.package_label+" individual units");
+   quantity.append(quantityLabel,input);label.append(info,quantity);section.append(label);
+  }
+  if(!availablePackages.length){const empty=document.createElement("p");empty.className="mixed-builder-empty";empty.textContent="No individual units are currently available for this product.";section.append(empty);}
+  box.append(section);
  }
- $("#mixed-builder-status").textContent="Choose individual quantities. Add them to your cart, then continue to checkout.";const dialog=$("#mixed-builder-dialog");if(dialog.showModal)dialog.showModal();else dialog.setAttribute("open","");
+ updateMixedBuilderSummary();
+ $("#mixed-builder-status").textContent="Minimum order: 10 individual units combined across all sizes. Choose quantities below, then add them to your cart.";
+ const dialog=$("#mixed-builder-dialog");if(dialog.showModal)dialog.showModal();else dialog.setAttribute("open","");
+}
+function updateMixedBuilderSummary(){
+ const inputs=[...($("#mixed-builder-options")?.querySelectorAll("input[data-package-id]")||[])];
+ const units=inputs.reduce((sum,input)=>sum+Math.max(0,Number(input.value)||0),0);
+ const total=inputs.reduce((sum,input)=>{const f=findPackage(Number(input.dataset.packageId));return sum+(f?Math.max(0,Number(input.value)||0)*Number(f.pkg.stock_unit_price||0):0);},0);
+ const summary=$("#mixed-builder-summary");
+ if(summary)summary.textContent=units+" individual unit"+(units===1?"":"s")+" selected · Estimated subtotal "+money(total);
+ const add=$("#add-mixed-to-cart");if(add)add.disabled=units===0;
 }
 function renderCheckout(){
  const box=$("#checkout-summary");if(!box)return;box.replaceChildren();const isMixed=new URL(location.href).searchParams.get("type")==="mixed";const selected=isMixed?mixed:packages;let total=0,unitCount=0;
@@ -80,6 +105,7 @@ function initPage(){
  if(requested){const id=Number(requested),qty=Number(params.get("quantity")||1);const f=findPackage(id);if(f&&Number.isSafeInteger(qty)&&qty>=Number(f.pkg.minimum_order_quantity||1)&&qty<=Number(f.pkg.stock_quantity)){packages.set(id,(packages.get(id)||0)+qty);save(keys.packages,packages);$("#cart-status").textContent="Package added to your cart.";}else $("#cart-status").textContent="Could not add that package. Check stock and try again.";params.delete("order_package");params.delete("quantity");history.replaceState({},"",location.pathname);}
  const mixedProduct=params.get("mixed_product");if(mixedProduct){params.delete("mixed_product");history.replaceState({},"",location.pathname);openBuilder(mixedProduct);}
  $("#open-mixed-builder").addEventListener("click",()=>openBuilder());
+ $("#mixed-builder-options").addEventListener("input",event=>{if(event.target.matches("input[data-package-id]"))updateMixedBuilderSummary();});
  $("#add-mixed-to-cart").addEventListener("click",()=>{const inputs=[...$("#mixed-builder-options").querySelectorAll("input[data-package-id]")];let added=0;
   for(const input of inputs){const q=Number(input.value),id=Number(input.dataset.packageId);if(!Number.isSafeInteger(q)||q<0){$("#mixed-builder-status").textContent="Use whole numbers for quantities.";return;}if(q){const f=findPackage(id),available=Number(f.pkg.stock_units_available??Number(f.pkg.stock_quantity)*Number(f.pkg.units_per_package||1));if(q>available){$("#mixed-builder-status").textContent="Selected quantity exceeds available stock.";return;}mixed.set(id,q);added+=q;}}
   if(!added){$("#mixed-builder-status").textContent="Choose at least one individual unit.";return;}save(keys.mixed,mixed);renderCart();$("#mixed-builder-dialog").close();$("#cart-status").textContent="Individual units added to cart.";
