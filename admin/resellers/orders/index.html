@@ -56,7 +56,56 @@
 .order-panel-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 body.order-panel-visible{overflow:hidden}
 @media(max-width:760px){.orders-toolbar{grid-template-columns:1fr 1fr}.orders-toolbar label:first-child{grid-column:1/-1}.order-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.order-panel-head{padding:16px}.order-panel-body{padding:15px}.order-panel-section{padding:14px}}
-@media(max-width:420px){.orders-toolbar{grid-template-columns:1fr}.orders-toolbar label:first-child{grid-column:auto}.order-metric{padding:12px}.order-metric strong{font-size:1.4rem}.order-panel-grid{grid-template-columns:1fr}}
+@media(max-width:760px){
+  .settings-heading{align-items:stretch;flex-direction:column;gap:14px}
+  .settings-heading>.button,.settings-heading>div+.button{align-self:flex-start;max-width:100%}
+  .orders-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .orders-toolbar label:first-child{grid-column:1/-1}
+  .orders-table-wrap{overflow:visible;border:0;background:transparent;box-shadow:none}
+  .orders-table{display:block;min-width:0;width:100%;border:0}
+  .orders-table thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .orders-table tbody{display:grid;gap:12px}
+  .orders-table tbody tr{display:grid;gap:0;min-width:0;border:1px solid var(--color-border);border-radius:14px;background:var(--color-surface);box-shadow:var(--shadow-sm);overflow:hidden}
+  .orders-table tbody tr:hover{background:var(--color-surface)}
+  .orders-table tbody tr.is-selected{border-color:var(--color-brand-secondary);background:var(--color-brand-secondary-soft)}
+  .orders-table td{display:grid;grid-template-columns:minmax(104px,.7fr) minmax(0,1.3fr);align-items:start;gap:12px;padding:11px 13px;border-bottom:1px solid var(--color-border);min-width:0;overflow-wrap:anywhere}
+  .orders-table td::before{font-size:.72rem;font-weight:750;letter-spacing:.035em;text-transform:uppercase;color:var(--color-text-muted)}
+  .orders-table td:nth-child(1)::before{content:"Order / date"}
+  .orders-table td:nth-child(2)::before{content:"Reseller"}
+  .orders-table td:nth-child(3)::before{content:"Product / package"}
+  .orders-table td:nth-child(4)::before{content:"Packages"}
+  .orders-table td:nth-child(5)::before{content:"Individual units"}
+  .orders-table td:nth-child(6)::before{content:"Total amount"}
+  .orders-table td:nth-child(7)::before{content:"Payment / order status"}
+  .orders-table td:nth-child(8)::before{content:"Action"}
+  .orders-table td:last-child{border-bottom:0}
+  .orders-table td[colspan="8"]{display:block}
+  .orders-table td[colspan="8"]::before{content:none}
+  .order-detail-panel{inset:8px;width:auto;height:calc(100dvh - 16px);max-height:calc(100dvh - 16px);border:1px solid var(--color-border);border-radius:16px;transform:translateY(12px) scale(.985);opacity:0;pointer-events:none}
+  .order-detail-panel.is-open{transform:translateY(0) scale(1);opacity:1;pointer-events:auto}
+  .order-panel-head{padding:14px;gap:10px;align-items:center}
+  .order-panel-head h2{font-size:clamp(1.5rem,6vw,2rem);overflow-wrap:anywhere}
+  .order-panel-head>div{min-width:0;flex:1 1 160px}
+  .order-panel-head>#order-panel-close{flex:0 0 auto;padding:.6rem .8rem}
+  .order-panel-body{padding:12px}
+  .order-panel-section{padding:13px;margin-bottom:12px}
+  .order-panel-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .order-detail-line{grid-template-columns:minmax(0,1fr);gap:7px}
+  .order-detail-line-total{text-align:left}
+  .order-panel-actions{align-items:stretch;flex-direction:column}
+  .order-panel-actions .button{width:100%}
+  .order-manage-form .settings-load-status{overflow-wrap:anywhere}
+}
+@media(max-width:420px){
+  .orders-toolbar{grid-template-columns:1fr}
+  .orders-toolbar label:first-child{grid-column:auto}
+  .order-metric{padding:12px}
+  .order-metric strong{font-size:1.4rem}
+  .order-panel-grid{grid-template-columns:1fr}
+  .orders-table td{grid-template-columns:minmax(90px,.65fr) minmax(0,1.35fr);gap:8px;padding:10px}
+  .order-panel-head{align-items:flex-start}
+  .order-panel-head>#order-panel-close{padding:.55rem .65rem;font-size:.75rem}
+}
 @media(prefers-reduced-motion:reduce){.order-detail-panel,.order-panel-backdrop{transition:none}}
 </style>
 </head>
