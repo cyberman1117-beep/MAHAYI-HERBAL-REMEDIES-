@@ -307,7 +307,6 @@ async function loadAccount() {
   $(".admin-status").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved distributor" : "Standard reseller";
   $(".admin-stats .stat-card:nth-child(3) strong").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved" : "No access";
   $(".admin-stats .stat-card:nth-child(3) small").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved for pay-later stock requests" : "Reserved for selected distributors";
-  $("#pay-later-option").hidden = Number(reseller.pay_later_enabled) !== 1;
   $("#products-status").textContent = "Loading products…";
   try {
     const productData = await api("products");
