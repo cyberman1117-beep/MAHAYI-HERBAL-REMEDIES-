@@ -148,7 +148,8 @@ function renderProducts(data) {
         if (!Number.isSafeInteger(quantity) || quantity < Number(pkg.minimum_order_quantity || 1)) { $("#cart-status").textContent = "Enter a whole-number quantity that meets this package’s minimum order."; return; }
         if (quantity + (cart.get(id) || 0) > Number(pkg.stock_quantity)) { $("#cart-status").textContent = "That package quantity is not currently available."; return; }
         cart.set(id, (cart.get(id) || 0) + quantity); renderCart();
-        $("#cart-status").textContent = product.name + " (" + pkg.package_label + ") added to your stock order.";
+        $("#cart-status").textContent = product.name + " (" + pkg.package_label + ") added to your cart. Review it below, then continue to checkout.";
+        $("#stock-cart").scrollIntoView({ behavior: "smooth", block: "start" });
       });
       const addSale = document.createElement("button"); addSale.className = "button button-outline"; addSale.type = "button"; addSale.textContent = "Record sale"; addSale.style.marginTop = ".35rem";
       if (Number(pkg.reseller_stock_quantity || 0) < 1) { addSale.disabled = true; addSale.textContent = "No stock"; }
