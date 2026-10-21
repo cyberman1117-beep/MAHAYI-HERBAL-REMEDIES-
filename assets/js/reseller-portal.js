@@ -19,6 +19,7 @@ let currentUser = null;
 let authFlowInProgress = false;
 let products = [];
 const cart = new Map();
+const mixedCart = new Map();
 const saleCart = new Map();
 
 function showPanel(selector) { panels.forEach((panel) => { $(panel).hidden = panel !== selector; }); }
@@ -122,7 +123,7 @@ function renderProducts(data) {
     }
     const table = document.createElement("table"); table.className = "data-table";
     const thead = document.createElement("thead"), tr = document.createElement("tr");
-    for (const label of ["Stock package", "Units/package", "Cost per unit", "Selling price/unit", "Profit/unit", "Package cost", "Packages available", "Order packages", "Choose"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; tr.append(th); }
+    for (const label of ["Stock package", "Units/package", "Cost per unit", "Selling price/unit", "Profit/unit", "Package cost", "Packages available", "Order packages", "Choose", "Mixed-order units"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; tr.append(th); }
     thead.append(tr); table.append(thead);
     const tbody = document.createElement("tbody");
     for (const pkg of (product.packages || []).filter((item) => Number(item.is_enabled) === 1)) {
@@ -158,7 +159,11 @@ function renderProducts(data) {
         $("#sale-cart-status").textContent = product.name + " (" + pkg.package_label + ") added to the customer sale.";
       });
       actions.append(add, document.createTextNode(" "), addSale);
-      row.append(label, unitsCell, stockAmount, resale, commission, packageCost, stock, qtyCell, actions); tbody.append(row);
+      const mixedCell = document.createElement("td"); const mixedQty = document.createElement("input"); mixedQty.type = "number"; mixedQty.min = "0"; mixedQty.step = "1"; mixedQty.value = "0"; mixedQty.max = String(Number(pkg.stock_units_available ?? (Number(pkg.stock_quantity) * units))); mixedQty.style.width = "5rem"; mixedQty.setAttribute("aria-label", "Individual units of " + product.name + " " + pkg.package_label + " for mixed order");
+      const addMixed = document.createElement("button"); addMixed.className = "button button-outline"; addMixed.type = "button"; addMixed.textContent = "Add units"; addMixed.style.marginTop = ".3rem"; if (Number(mixedQty.max) < 1) { mixedQty.disabled = true; addMixed.disabled = true; addMixed.textContent = "Out of stock"; }
+      addMixed.addEventListener("click", () => { const quantity = Number(mixedQty.value), id = Number(pkg.package_id); const availableUnits = Number(pkg.stock_units_available ?? (Number(pkg.stock_quantity) * units)); if (!Number.isSafeInteger(quantity) || quantity < 1) { $("#mixed-cart-status").textContent = "Enter a whole-number quantity of individual units."; return; } if (quantity + (mixedCart.get(id) || 0) > availableUnits) { $("#mixed-cart-status").textContent = "That many individual units are not currently available."; return; } mixedCart.set(id, (mixedCart.get(id) || 0) + quantity); mixedQty.value = "0"; renderMixedCart(); $("#mixed-cart-status").textContent = product.name + " (" + pkg.package_label + ") added to your mixed order."; });
+      mixedCell.append(mixedQty, document.createElement("br"), addMixed);
+      row.append(label, unitsCell, stockAmount, resale, commission, packageCost, stock, qtyCell, actions, mixedCell); tbody.append(row);
     }
     table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
     card.append(marker, details, wrap); list.append(card);
@@ -185,6 +190,19 @@ function renderCart() {
   $("#cart-total").textContent = payLater ? "Potential company share due as stock sells: " + money(total) : "Total to pay M.H.R.: " + money(total);
   $("#place-order").textContent = payLater ? "Request pay-later stock" : "Place stock order";
   $("#place-order").disabled = !chosen.length;
+  return chosen;
+}
+function renderMixedCart() {
+  const box = $("#mixed-cart-items"); if (!box) return [];
+  box.replaceChildren(); let total = 0, unitCount = 0; const chosen = [];
+  for (const [id, quantity] of mixedCart) {
+    const found = findPackage(id); if (!found) continue; const { product, pkg } = found;
+    total += Number(pkg.stock_unit_price || 0) * quantity; unitCount += quantity; chosen.push({ package_id: id, quantity });
+    const row = document.createElement("div"); row.className = "admin-panel"; const details = document.createElement("div"); const title = document.createElement("h3"); title.textContent = product.name + " — " + pkg.package_label; const amount = document.createElement("p"); amount.className = "muted"; amount.textContent = quantity + " individual unit(s) × " + money(pkg.stock_unit_price, product.currency) + " = " + money(Number(pkg.stock_unit_price) * quantity, product.currency); details.append(title, amount); const remove = document.createElement("button"); remove.className = "button button-outline"; remove.type = "button"; remove.textContent = "Remove"; remove.addEventListener("click", () => { mixedCart.delete(id); renderMixedCart(); }); row.append(details, remove); box.append(row);
+  }
+  if (!chosen.length) { const p = document.createElement("p"); p.className = "muted"; p.textContent = "No individual units selected."; box.append(p); }
+  $("#mixed-cart-total").textContent = "Mixed order: " + unitCount + " individual unit(s) · " + money(total);
+  $("#place-mixed-order").disabled = unitCount < 10; $("#place-mixed-order").textContent = unitCount < 10 ? "Place mixed order (minimum 10 units)" : "Place mixed order (" + unitCount + " units)";
   return chosen;
 }
 function renderSaleCart() {
@@ -298,6 +316,7 @@ async function loadAccount() {
     const productData = await api("products");
     renderProducts(productData.data?.products || []);
     renderCart();
+    renderMixedCart();
     renderSaleCart();
   } catch (error) {
     $("#products-status").textContent = "Your account is signed in, but the catalogue could not load: " + error.message;
@@ -353,6 +372,18 @@ $("#record-sale").addEventListener("click", async () => {
 });
 $("#refresh-inventory").addEventListener("click", loadInventoryAndOrders);
 $("#refresh-orders").addEventListener("click", loadInventoryAndOrders);
+$("#place-mixed-order").addEventListener("click", async () => {
+  const items = renderMixedCart(); const unitCount = items.reduce((sum, item) => sum + Number(item.quantity), 0); if (unitCount < 10) { $("#mixed-cart-status").textContent = "A mixed order must contain at least 10 individual units across all selected sizes."; return; }
+  const button = $("#place-mixed-order"); button.disabled = true; $("#mixed-cart-status").textContent = "Submitting mixed stock order…";
+  try {
+    const fulfilmentMode = $("#pay-later-mode")?.checked ? "pay_later" : "upfront";
+    const result = await api("stock-orders", "POST", { order_type: "mixed", items, fulfilment_mode: fulfilmentMode, reseller_notes: $("#order-note").value });
+    mixedCart.clear(); renderMixedCart();
+    $("#mixed-cart-status").textContent = "Mixed order " + result.data.order_number + " submitted for " + unitCount + " individual units. Total: " + money(result.data.total_amount, result.data.currency) + ". " + (fulfilmentMode === "pay_later" ? "M.H.R. must approve and release the stock." : "Please arrange payment with M.H.R.; stock is not released until payment is verified.");
+    await loadAccount();
+  } catch (error) { $("#mixed-cart-status").textContent = error.message; }
+  finally { button.disabled = mixedCart.size === 0 || [...mixedCart.values()].reduce((sum, quantity) => sum + quantity, 0) < 10; }
+});
 $("#place-order").addEventListener("click", async () => {
   const items = renderCart();
   if (!items.length) return;
