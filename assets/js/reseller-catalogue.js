@@ -62,12 +62,12 @@ function renderList() {
     if (product.image_url && /^https?:\/\//i.test(product.image_url)) { const image = document.createElement("img"); image.src = product.image_url; image.alt = product.name; image.loading = "lazy"; image.style.width = "min(100%, 240px)"; image.style.height = "auto"; image.style.objectFit = "contain"; details.prepend(image); }
     const table = document.createElement("table"); table.className = "data-table";
     const thead = document.createElement("thead"), tr = document.createElement("tr");
-    for (const label of ["Package", "Stock amount", "Resale amount", "Your commission"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; tr.append(th); }
+    for (const label of ["Stock package", "Units/package", "Cost per unit", "Selling price/unit", "Profit/unit", "Package cost"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; tr.append(th); }
     thead.append(tr); table.append(thead);
     const tbody = document.createElement("tbody");
     for (const pkg of (product.packages || []).filter((item) => Number(item.is_enabled) === 1)) {
       const row = document.createElement("tr");
-      for (const value of [pkg.package_label, money(pkg.stock_unit_price, product.currency), money(pkg.customer_price, product.currency), money(pkg.reseller_share, product.currency)]) { const td = document.createElement("td"); td.textContent = value || ""; row.append(td); }
+      for (const value of [pkg.package_label, String(pkg.units_per_package || 1), money(pkg.stock_unit_price, product.currency), money(pkg.customer_price, product.currency), money(pkg.reseller_share, product.currency), money(Number(pkg.stock_unit_price) * Number(pkg.units_per_package || 1), product.currency)]) { const td = document.createElement("td"); td.textContent = value || ""; row.append(td); }
       tbody.append(row);
     }
     table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
@@ -106,13 +106,13 @@ function renderRoute() {
   const imageUrl = product.image_url && /^https?:\/\//i.test(product.image_url) ? product.image_url : "";
   const table = document.createElement("table"); table.className = "data-table";
   const thead = document.createElement("thead"), header = document.createElement("tr");
-  for (const label of ["Package", "Stock amount", "Resale amount", "Your commission", "M.H.R. stock", "Your stock", "Order quantity", "Action"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; header.append(th); }
+  for (const label of ["Stock package", "Units/package", "Cost per unit", "Selling price/unit", "Profit/unit", "Package cost", "Stock packages available", "Your units", "Order packages", "Action"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; header.append(th); }
   thead.append(header); table.append(thead);
   const tbody = document.createElement("tbody");
   const enabledPackages = (product.packages || []).filter((item) => Number(item.is_enabled) === 1);
   for (const pkg of enabledPackages) {
     const row = document.createElement("tr");
-    for (const value of [pkg.package_label || "Package", money(pkg.stock_unit_price, product.currency), money(pkg.customer_price, product.currency), money(pkg.reseller_share, product.currency), String(pkg.stock_quantity ?? 0), String(pkg.reseller_stock_quantity || 0)]) { const td = document.createElement("td"); td.textContent = value; row.append(td); }
+    for (const value of [pkg.package_label || "Package", String(pkg.units_per_package || 1), money(pkg.stock_unit_price, product.currency), money(pkg.customer_price, product.currency), money(pkg.reseller_share, product.currency), money(Number(pkg.stock_unit_price) * Number(pkg.units_per_package || 1), product.currency), String(pkg.stock_quantity ?? 0), String(pkg.reseller_stock_quantity || 0)]) { const td = document.createElement("td"); td.textContent = value; row.append(td); }
     const qtyCell = document.createElement("td");
     const qty = document.createElement("input"); qty.type = "number"; qty.min = String(pkg.minimum_order_quantity || 1); qty.step = "1"; qty.value = String(pkg.minimum_order_quantity || 1); qty.style.width = "5.5rem"; qty.setAttribute("aria-label", "Order quantity for " + pkg.package_label); qtyCell.append(qty); row.append(qtyCell);
     const actionCell = document.createElement("td");
@@ -134,7 +134,7 @@ function renderRoute() {
   table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
   $("#detail-information").append(wrap);
   const instruction = document.createElement("p"); instruction.className = "settings-notice";
-  instruction.textContent = enabledPackages.length ? "Choose the package size, enter how many you want, then select “Order this package”. Your selection will be added to your stock order for review before you submit it." : "No package options are available for this product yet.";
+  instruction.textContent = enabledPackages.length ? "Choose a stock package, enter how many packages to buy, then select “Order this package”. The amount payable is per-unit stock cost × units per package × number of packages ordered." : "No package options are available for this product yet.";
   $("#detail-information").append(instruction);
   $("#dashboard-product-link").href = "../index.html";
 }
