@@ -72,7 +72,7 @@ function renderList() {
     }
     table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
     const button = document.createElement("button"); button.className = "button button-primary"; button.type = "button"; button.textContent = "View product"; button.addEventListener("click", () => openProduct(product));
-    const mixedButton = document.createElement("button"); mixedButton.className = "button button-outline"; mixedButton.type = "button"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => { const destination = new URL("../index.html", location.href); destination.searchParams.set("mixed_product", String(product.id)); destination.hash = "stock-cart"; location.href = destination.href; });
+    const mixedButton = document.createElement("button"); mixedButton.className = "button button-outline"; mixedButton.type = "button"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => { const destination = new URL("../cart/", location.href); destination.searchParams.set("mixed_product", String(product.id)); location.href = destination.href; });
     card.append(marker, details, wrap, button, mixedButton); list.append(card);
   }
 }
@@ -111,7 +111,7 @@ function renderRoute() {
   thead.append(header); table.append(thead);
   const tbody = document.createElement("tbody");
   const enabledPackages = (product.packages || []).filter((item) => Number(item.is_enabled) === 1);
-  const mixedButton = document.createElement("button"); mixedButton.type = "button"; mixedButton.className = "button button-outline"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => { const destination = new URL("../index.html", location.href); destination.searchParams.set("mixed_product", String(product.id)); destination.hash = "stock-cart"; location.href = destination.href; });
+  const mixedButton = document.createElement("button"); mixedButton.type = "button"; mixedButton.className = "button button-outline"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => { const destination = new URL("../cart/", location.href); destination.searchParams.set("mixed_product", String(product.id)); location.href = destination.href; });
   $("#detail-information").append(mixedButton);
   for (const pkg of enabledPackages) {
     const row = document.createElement("tr");
@@ -126,10 +126,9 @@ function renderRoute() {
       const quantity = Number(qty.value);
       if (!Number.isSafeInteger(quantity) || quantity < Number(pkg.minimum_order_quantity || 1)) { qty.focus(); return; }
       if (quantity > Number(pkg.stock_quantity)) { qty.focus(); order.textContent = "Not enough stock"; return; }
-      const destination = new URL("../index.html", location.href);
+      const destination = new URL("../cart/", location.href);
       destination.searchParams.set("order_package", String(pkg.package_id || pkg.id));
       destination.searchParams.set("quantity", String(quantity));
-      destination.hash = "stock-cart";
       location.href = destination.href;
     });
     actionCell.append(order); row.append(actionCell); tbody.append(row);
