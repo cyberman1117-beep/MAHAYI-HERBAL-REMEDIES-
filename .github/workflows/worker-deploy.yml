@@ -28,6 +28,13 @@ jobs:
         with:
           node-version: 22
 
+      - name: Validate reseller JavaScript
+        run: |
+          node --check assets/js/reseller-portal.js
+          node --check assets/js/reseller-catalogue.js
+          node --check src/reseller-portal-api.js
+          node --check src/reseller-catalog-api.js
+
       - name: Apply D1 migrations
         run: npx wrangler d1 migrations apply mahayi-herbal-remedies-db --remote --config wrangler.toml
         env:
