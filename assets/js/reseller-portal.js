@@ -319,6 +319,8 @@ async function loadAccount() {
     renderCart();
     renderMixedCart();
     renderSaleCart();
+    const routeUrl = new URL(location.href); const mixedProduct = routeUrl.searchParams.get("mixed_product");
+    if (mixedProduct) { routeUrl.searchParams.delete("mixed_product"); history.replaceState({}, "", routeUrl); openMixedBuilder(mixedProduct); }
   } catch (error) {
     $("#products-status").textContent = "Your account is signed in, but the catalogue could not load: " + error.message;
   }
