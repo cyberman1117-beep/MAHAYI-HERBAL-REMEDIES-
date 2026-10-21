@@ -998,3 +998,14 @@ body.customer-sticky-chat-open{overflow:hidden}
  .reseller-checkout-quantity-label { grid-column:1 / -1; }
  .reseller-checkout-remove { justify-self:start; }
 }
+
+
+/* Quantity controls belong on the reseller cart page */
+.reseller-cart-quantity-controls { display:flex; flex:0 0 auto; align-items:end; gap:.6rem; flex-wrap:wrap; }
+.reseller-cart-quantity-label { display:flex; flex-direction:column; gap:.35rem; font-size:var(--font-size-xs); font-weight:var(--font-weight-semibold); }
+.reseller-cart-quantity { width:6rem; min-height:44px; padding:.5rem; border:1px solid var(--color-border-strong); border-radius:var(--radius-sm); background:var(--color-surface); color:var(--color-text); }
+@media(max-width:560px) {
+ .reseller-cart-quantity-controls { display:grid; grid-template-columns:minmax(5rem,7rem) 1fr; align-items:end; }
+ .reseller-cart-quantity-label { grid-column:1 / -1; }
+ .reseller-cart-quantity-controls .reseller-cart-remove { justify-self:start; }
+}
