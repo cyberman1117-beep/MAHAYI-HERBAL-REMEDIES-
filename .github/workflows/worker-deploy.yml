@@ -32,6 +32,7 @@ jobs:
         run: |
           node --check assets/js/reseller-portal.js
           node --check assets/js/reseller-catalogue.js
+          node --check assets/js/reseller-order-flow.js
           node --check src/reseller-portal-api.js
           node --check src/reseller-catalog-api.js
 
