@@ -19,6 +19,26 @@ async function api(action, method="GET", body) {
 }
 function findPackage(id){for(const product of products){const pkg=(product.packages||[]).find(p=>Number(p.package_id||p.id)===Number(id));if(pkg)return {product,pkg};}return null;}
 function go(path){location.href=path;}
+function cartQuantityControl(id,qty,isMixed,product,pkg){
+ const wrap=document.createElement("div");wrap.className="reseller-cart-quantity-controls";
+ const label=document.createElement("label");label.className="reseller-cart-quantity-label";label.textContent=isMixed?"Individual units":"Full packages";
+ const input=document.createElement("input");input.type="number";input.inputMode="numeric";input.min="1";input.step="1";input.value=String(qty);input.className="reseller-cart-quantity";input.setAttribute("aria-label",label.textContent+" quantity for "+product.name+" "+pkg.package_label);
+ const unitsPerPackage=Math.max(1,Number(pkg.units_per_package||1));
+ const max=isMixed?Number(pkg.stock_units_available??Number(pkg.stock_quantity)*unitsPerPackage):Number(pkg.stock_quantity);
+ input.max=String(Math.max(1,max));
+ input.addEventListener("change",()=>{
+  const next=Number(input.value);
+  if(!Number.isSafeInteger(next)||next<1){input.value=String(qty);return;}
+  if(next>max){input.value=String(qty);const status=$("#cart-status");if(status)status.textContent="That quantity exceeds available stock.";return;}
+  const map=isMixed?mixed:packages,key=isMixed?keys.mixed:keys.packages;map.set(id,next);save(key,map);renderCart();
+  const status=$("#cart-status");if(status)status.textContent="Cart quantity updated.";
+ });
+ const remove=document.createElement("button");remove.type="button";remove.className="button button-outline reseller-cart-remove";remove.textContent="Remove item";remove.addEventListener("click",()=>{
+  const map=isMixed?mixed:packages,key=isMixed?keys.mixed:keys.packages;map.delete(id);save(key,map);renderCart();
+  const status=$("#cart-status");if(status)status.textContent="Item removed from your cart.";
+ });
+ wrap.append(label,input,remove);return wrap;
+}
 function lineRow(product,pkg,quantity,isMixed){
  const row=document.createElement("article");row.className="reseller-cart-line "+(isMixed?"reseller-cart-line-mixed":"reseller-cart-line-package");
  const details=document.createElement("div");details.className="reseller-cart-line-details";
@@ -26,13 +46,10 @@ function lineRow(product,pkg,quantity,isMixed){
  const h=document.createElement("h3");h.textContent=product.name+" — "+(pkg.package_label||"Stock size");
  const unitsPerPackage=Math.max(1,Number(pkg.units_per_package||1));const units=isMixed?quantity:quantity*unitsPerPackage;const total=Number(pkg.stock_unit_price||0)*units;
  const description=document.createElement("p");description.className="reseller-cart-line-description";
- description.textContent=isMixed
-  ? quantity+" individual unit(s) × "+money(pkg.stock_unit_price,product.currency)+" per unit"
-  : quantity+" full package(s) × "+unitsPerPackage+" unit(s) per package";
+ description.textContent=isMixed?quantity+" individual unit(s) × "+money(pkg.stock_unit_price,product.currency)+" per unit":quantity+" full package(s) × "+unitsPerPackage+" unit(s) per package";
  const subtotal=document.createElement("p");subtotal.className="reseller-cart-line-subtotal";subtotal.textContent="Line subtotal: "+money(total,product.currency);
  details.append(badge,h,description,subtotal);
- const remove=document.createElement("button");remove.type="button";remove.className="button button-outline reseller-cart-remove";remove.textContent="Remove item";remove.setAttribute("aria-label","Remove "+(isMixed?"individual units":"full packages")+" of "+product.name+" "+pkg.package_label+" from cart");remove.addEventListener("click",()=>{(isMixed?mixed:packages).delete(Number(pkg.package_id||pkg.id));save(isMixed?keys.mixed:keys.packages,isMixed?mixed:packages);renderCart();});
- row.append(details,remove);return {row,total,units};
+ row.append(details,cartQuantityControl(Number(pkg.package_id||pkg.id),quantity,isMixed,product,pkg));return {row,total,units};
 }
 function renderCart(){
  const box=$("#cart-items");if(!box)return;box.replaceChildren();let total=0,packageCount=0,mixedUnits=0;
