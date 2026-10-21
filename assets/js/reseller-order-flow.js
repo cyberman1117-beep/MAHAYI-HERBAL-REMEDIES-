@@ -89,37 +89,8 @@ function getCartLines(){
 }
 function renderCheckout(){
  const box=$("#checkout-summary");if(!box)return;box.replaceChildren();const items=getCartLines();let total=0,mixedUnits=0;
- for(const item of items){
-  const f=findPackage(item.package_id);if(!f)continue;
-  const isMixed=item.item_type==="mixed",id=Number(item.package_id);
-  const unitsPerPackage=Math.max(1,Number(f.pkg.units_per_package||1));
-  const units=isMixed?item.quantity:item.quantity*unitsPerPackage;
-  const amount=Number(f.pkg.stock_unit_price||0)*units;total+=amount;if(isMixed)mixedUnits+=item.quantity;
-  const row=document.createElement("article");row.className="reseller-checkout-line "+(isMixed?"reseller-checkout-line-mixed":"reseller-checkout-line-package");
-  const details=document.createElement("div");details.className="reseller-checkout-line-details";
-  const badge=document.createElement("span");badge.className="reseller-cart-type-badge "+(isMixed?"is-individual":"is-package");badge.textContent=isMixed?"INDIVIDUAL UNITS":"FULL PACKAGE";
-  const title=document.createElement("h3");title.textContent=f.product.name+" — "+f.pkg.package_label;
-  const price=document.createElement("p");price.className="reseller-cart-line-description";price.textContent=isMixed?money(f.pkg.stock_unit_price,f.product.currency)+" per individual unit":money(Number(f.pkg.stock_unit_price||0)*unitsPerPackage,f.product.currency)+" per full package ("+unitsPerPackage+" units)";
-  const subtotal=document.createElement("p");subtotal.className="reseller-cart-line-subtotal";subtotal.textContent="Subtotal: "+money(amount,f.product.currency);
-  details.append(badge,title,price,subtotal);
-  const controls=document.createElement("div");controls.className="reseller-checkout-line-controls";
-  const qtyLabel=document.createElement("label");qtyLabel.className="reseller-checkout-quantity-label";qtyLabel.textContent=isMixed?"Individual units":"Full packages";
-  const quantity=document.createElement("input");quantity.type="number";quantity.inputMode="numeric";quantity.min="1";quantity.step="1";quantity.className="reseller-checkout-quantity";quantity.value=String(item.quantity);quantity.dataset.packageId=String(id);quantity.dataset.itemType=item.item_type;quantity.setAttribute("aria-label",(isMixed?"Individual units":"Full packages")+" quantity for "+f.product.name+" "+f.pkg.package_label);
-  const stockMax=isMixed?Number(f.pkg.stock_units_available??Number(f.pkg.stock_quantity)*unitsPerPackage):Number(f.pkg.stock_quantity);
-  quantity.max=String(Math.max(1,stockMax));
-  quantity.addEventListener("change",()=>{
-   const next=Number(quantity.value),map=isMixed?mixed:packages,key=isMixed?keys.mixed:keys.packages;
-   if(!Number.isSafeInteger(next)||next<1){quantity.value=String(item.quantity);return;}
-   if(next>stockMax){quantity.value=String(item.quantity);const status=$("#checkout-status");if(status)status.textContent="That quantity exceeds available stock.";return;}
-   map.set(id,next);save(key,map);renderCheckout();
-   const status=$("#checkout-status");if(status)status.textContent="Cart quantity updated.";
-  });
-  const remove=document.createElement("button");remove.type="button";remove.className="button button-outline reseller-checkout-remove";remove.textContent="Remove item";remove.addEventListener("click",()=>{
-   const map=isMixed?mixed:packages;map.delete(id);save(isMixed?keys.mixed:keys.packages,map);renderCheckout();
-   const status=$("#checkout-status");if(status)status.textContent="Item removed from your order.";
-  });
-  controls.append(qtyLabel,quantity,remove);row.append(details,controls);box.append(row);
- }
+ for(const item of items){const f=findPackage(item.package_id);if(!f)continue;const isMixed=item.item_type==="mixed";const units=isMixed?item.quantity:item.quantity*Number(f.pkg.units_per_package||1);const amount=Number(f.pkg.stock_unit_price||0)*units;total+=amount;if(isMixed)mixedUnits+=item.quantity;
+  const p=document.createElement("p");p.textContent=f.product.name+" — "+f.pkg.package_label+": "+(isMixed?item.quantity+" individual unit(s)":item.quantity+" full package(s), "+units+" units")+" · "+money(amount,f.product.currency);box.append(p);}
  if(!items.length)box.textContent="Your cart is empty. Return to the cart to add products.";
  $("#confirm-stock-order").disabled=!items.length||(mixed.size>0&&mixedUnits<10);
  $("#checkout-total").textContent="Total for all cart items: "+money(total);
