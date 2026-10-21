@@ -7,6 +7,8 @@ on:
     paths:
       - "src/**"
       - "assets/js/**"
+      - "assets/css/**"
+      - "reseller/**"
       - "migrations/**"
       - "wrangler.toml"
       - ".github/workflows/worker-deploy.yml"
