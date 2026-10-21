@@ -83,7 +83,7 @@ export async function handleResellerPortal(request, env) {
         ORDER BY p.sort_order, p.name, p.id
       `).all();
       const packageResult = await env.DB.prepare(`
-        SELECT pkg.id AS package_id, pkg.reseller_product_id, pkg.package_label,
+        SELECT pkg.id AS package_id, pkg.reseller_product_id, pkg.package_label, pkg.units_per_package,
                pkg.stock_amount AS stock_unit_price, pkg.resale_amount AS customer_price,
                pkg.commission AS reseller_share, pkg.stock_quantity, pkg.minimum_order_quantity,
                pkg.is_enabled, COALESCE(ri.quantity_available, 0) AS reseller_stock_quantity,
@@ -149,7 +149,7 @@ export async function handleResellerPortal(request, env) {
       let currency = "ZAR";
       for (const [packageId, quantity] of quantities) {
         const pkg = await env.DB.prepare(`
-          SELECT pkg.id AS package_id, pkg.reseller_product_id AS product_id, pkg.package_label, pkg.stock_amount, pkg.resale_amount, pkg.commission,
+          SELECT pkg.id AS package_id, pkg.reseller_product_id AS product_id, pkg.package_label, pkg.units_per_package, pkg.stock_amount, pkg.resale_amount, pkg.commission,
                  pkg.stock_quantity, pkg.minimum_order_quantity, p.name, p.sku, p.currency
           FROM reseller_product_packages pkg JOIN reseller_products p ON p.id = pkg.reseller_product_id
           LEFT JOIN reseller_categories c ON c.id = p.category_id
@@ -160,7 +160,7 @@ export async function handleResellerPortal(request, env) {
         if (quantity > Number(pkg.stock_quantity)) return json({ success: false, error: "Not enough stock available for " + pkg.name + " (" + pkg.package_label + "). Please refresh the catalogue." }, 409);
         currency = pkg.currency || "ZAR";
         const wholesale = Number(pkg.stock_amount), customerPrice = Number(pkg.resale_amount), resellerShare = Number(pkg.commission);
-        const lineTotal = Math.round(wholesale * quantity * 100) / 100;
+        const lineTotal = Math.round(wholesale * Number(pkg.units_per_package || 1) * quantity * 100) / 100;
         total = Math.round((total + lineTotal) * 100) / 100;
         orderItems.push({ pkg, packageId, productId: Number(pkg.product_id), quantity, wholesale, customerPrice, resellerShare, lineTotal });
       }
@@ -176,9 +176,9 @@ export async function handleResellerPortal(request, env) {
           statements.push(env.DB.prepare("UPDATE reseller_product_packages SET stock_quantity = stock_quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stock_quantity >= ?").bind(item.quantity, item.packageId, item.quantity));
           statements.push(env.DB.prepare(`
             INSERT INTO reseller_stock_order_items
-              (reseller_stock_order_id, reseller_product_id, package_id, package_label, product_name, product_sku, quantity, wholesale_unit_price, customer_unit_price, reseller_unit_share, line_total, currency)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(created.id, item.productId, item.packageId, item.pkg.package_label, item.pkg.name + " — " + item.pkg.package_label, item.pkg.sku || "", item.quantity, item.wholesale, item.customerPrice, item.resellerShare, item.lineTotal, item.pkg.currency || "ZAR"));
+              (reseller_stock_order_id, reseller_product_id, package_id, package_label, product_name, product_sku, quantity, wholesale_unit_price, customer_unit_price, reseller_unit_share, line_total, currency, units_per_package)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(created.id, item.productId, item.packageId, item.pkg.package_label, item.pkg.name + " — " + item.pkg.package_label, item.pkg.sku || "", item.quantity, item.wholesale, item.customerPrice, item.resellerShare, item.lineTotal, item.pkg.currency || "ZAR", Number(item.pkg.units_per_package || 1)));
         }
         statements.push(env.DB.prepare("UPDATE reseller_stock_orders SET stock_reserved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(created.id));
         await env.DB.batch(statements);
