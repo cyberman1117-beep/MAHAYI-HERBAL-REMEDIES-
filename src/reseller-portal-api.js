@@ -135,60 +135,56 @@ export async function handleResellerPortal(request, env) {
       }
       if (request.method !== "POST") return json({ success: false, error: "Method not allowed." }, 405);
       const body = await request.json();
-      const orderType = body.order_type === "mixed" ? "mixed" : "packages";
       const fulfilmentMode = body.fulfilment_mode === "pay_later" ? "pay_later" : "upfront";
       if (fulfilmentMode === "pay_later" && Number(reseller.pay_later_enabled) !== 1) return json({ success: false, error: "Pay-later stock access has not been approved for your account." }, 403);
       if (!Array.isArray(body.items) || !body.items.length || body.items.length > 50) return json({ success: false, error: "Choose at least one item for your stock order." }, 400);
       const quantities = new Map();
       for (const item of body.items) {
         const packageId = Number(item.package_id), quantity = Number(item.quantity);
+        const itemType = item.item_type === "mixed" ? "mixed" : item.item_type === "packages" ? "packages" : (body.order_type === "mixed" ? "mixed" : "packages");
         if (!Number.isSafeInteger(packageId) || packageId <= 0 || !Number.isSafeInteger(quantity) || quantity <= 0) return json({ success: false, error: "Each stock order row needs a package and whole-number quantity." }, 400);
-        quantities.set(packageId, (quantities.get(packageId) || 0) + quantity);
+        const key = packageId + ":" + itemType, previous = quantities.get(key);
+        quantities.set(key, { packageId, quantity: (previous?.quantity || 0) + quantity, itemType });
       }
-      if (orderType === "mixed" && [...quantities.values()].reduce((sum, quantity) => sum + quantity, 0) < 10) return json({ success: false, error: "A mixed order must contain at least 10 individual units across all selected sizes." }, 400);
+      const rows = [...quantities.values()];
+      const mixedUnitCount = rows.filter(item => item.itemType === "mixed").reduce((sum, item) => sum + item.quantity, 0);
+      if (mixedUnitCount > 0 && mixedUnitCount < 10) return json({ success: false, error: "Individual-unit selections must total at least 10 units across the cart." }, 400);
       const orderItems = [];
       let total = 0;
       let currency = "ZAR";
-      for (const [packageId, quantity] of quantities) {
-        const pkg = await env.DB.prepare(`
-          SELECT pkg.id AS package_id, pkg.reseller_product_id AS product_id, pkg.package_label, pkg.units_per_package, pkg.stock_amount, pkg.resale_amount, pkg.commission,
-                 pkg.stock_quantity, pkg.stock_units_available, pkg.minimum_order_quantity, p.name, p.sku, p.currency
-          FROM reseller_product_packages pkg JOIN reseller_products p ON p.id = pkg.reseller_product_id
-          LEFT JOIN reseller_categories c ON c.id = p.category_id
-          WHERE pkg.id = ? AND pkg.is_enabled = 1 AND p.status = 'active' AND (p.category_id IS NULL OR c.is_enabled = 1)
-        `).bind(packageId).first();
+      const requestedUnitsByPackage = new Map();
+      for (const item of rows) {
+        const pkg = await env.DB.prepare("SELECT pkg.id AS package_id, pkg.reseller_product_id AS product_id, pkg.package_label, pkg.units_per_package, pkg.stock_amount, pkg.resale_amount, pkg.commission, pkg.stock_quantity, pkg.stock_units_available, pkg.minimum_order_quantity, p.name, p.sku, p.currency FROM reseller_product_packages pkg JOIN reseller_products p ON p.id = pkg.reseller_product_id LEFT JOIN reseller_categories c ON c.id = p.category_id WHERE pkg.id = ? AND pkg.is_enabled = 1 AND p.status = 'active' AND (p.category_id IS NULL OR c.is_enabled = 1)").bind(item.packageId).first();
         if (!pkg) return json({ success: false, error: "One selected package is no longer available." }, 400);
         const unitsPerPackage = Number(pkg.units_per_package || 1);
-        if (orderType === "packages" && quantity < Number(pkg.minimum_order_quantity)) return json({ success: false, error: pkg.name + " (" + pkg.package_label + ") requires a minimum order of " + pkg.minimum_order_quantity + " package(s)." }, 400);
-        const unitsNeeded = orderType === "mixed" ? quantity : quantity * unitsPerPackage;
+        if (item.itemType === "packages" && item.quantity < Number(pkg.minimum_order_quantity)) return json({ success: false, error: pkg.name + " (" + pkg.package_label + ") requires a minimum order of " + pkg.minimum_order_quantity + " package(s)." }, 400);
+        item.unitsNeeded = item.itemType === "mixed" ? item.quantity : item.quantity * unitsPerPackage;
+        item.pkg = pkg;
+        requestedUnitsByPackage.set(item.packageId, (requestedUnitsByPackage.get(item.packageId) || 0) + item.unitsNeeded);
+      }
+      for (const item of rows) {
+        const pkg = item.pkg, unitsPerPackage = Number(pkg.units_per_package || 1);
         const unitsAvailable = Number(pkg.stock_units_available ?? (Number(pkg.stock_quantity) * unitsPerPackage));
-        if (unitsNeeded > unitsAvailable || (orderType === "packages" && quantity > Number(pkg.stock_quantity))) return json({ success: false, error: "Not enough stock available for " + pkg.name + " (" + pkg.package_label + "). Please refresh the catalogue." }, 409);
-        currency = pkg.currency || "ZAR";
+        const packageCountAvailable = Math.floor(unitsAvailable / unitsPerPackage);
+        if ((requestedUnitsByPackage.get(item.packageId) || 0) > unitsAvailable || (item.itemType === "packages" && item.quantity > packageCountAvailable)) return json({ success: false, error: "Not enough stock available for " + pkg.name + " (" + pkg.package_label + "). Please refresh the catalogue." }, 409);
+        currency = pkg.currency || currency;
         const wholesale = Number(pkg.stock_amount), customerPrice = Number(pkg.resale_amount), resellerShare = Number(pkg.commission);
-        const itemUnitsPerPackage = orderType === "mixed" ? 1 : unitsPerPackage;
-        const lineTotal = Math.round(wholesale * itemUnitsPerPackage * quantity * 100) / 100;
+        const itemUnitsPerPackage = item.itemType === "mixed" ? 1 : unitsPerPackage;
+        const lineTotal = Math.round(wholesale * itemUnitsPerPackage * item.quantity * 100) / 100;
         total = Math.round((total + lineTotal) * 100) / 100;
-        orderItems.push({ pkg, packageId, productId: Number(pkg.product_id), quantity, unitsNeeded, itemUnitsPerPackage, wholesale, customerPrice, resellerShare, lineTotal });
+        orderItems.push({ ...item, productId: Number(pkg.product_id), itemUnitsPerPackage, wholesale, customerPrice, resellerShare, lineTotal });
       }
       const orderNumber = "MHR-RS-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + crypto.randomUUID().slice(0,8).toUpperCase();
-      const created = await env.DB.prepare(`
-        INSERT INTO reseller_stock_orders (order_number, reseller_id, currency, total_amount, payment_status, order_status, fulfilment_mode, reseller_notes)
-        VALUES (?, ?, ?, ?, 'pending', 'submitted', ?, ?)
-        RETURNING id
-      `).bind(orderNumber, reseller.id, currency, total, fulfilmentMode, clean(body.reseller_notes, 2000)).first();
+      const created = await env.DB.prepare("INSERT INTO reseller_stock_orders (order_number, reseller_id, currency, total_amount, payment_status, order_status, fulfilment_mode, reseller_notes) VALUES (?, ?, ?, ?, 'pending', 'submitted', ?, ?) RETURNING id").bind(orderNumber, reseller.id, currency, total, fulfilmentMode, clean(body.reseller_notes, 2000)).first();
       try {
         const statements = [];
         for (const item of orderItems) {
-          if (orderType === "mixed") {
+          if (item.itemType === "mixed") {
             statements.push(env.DB.prepare("UPDATE reseller_product_packages SET stock_units_available = stock_units_available - ?, stock_quantity = CAST((stock_units_available - ?) / units_per_package AS INTEGER), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stock_units_available >= ?").bind(item.unitsNeeded, item.unitsNeeded, item.packageId, item.unitsNeeded));
           } else {
             statements.push(env.DB.prepare("UPDATE reseller_product_packages SET stock_quantity = stock_quantity - ?, stock_units_available = stock_units_available - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND stock_quantity >= ? AND stock_units_available >= ?").bind(item.quantity, item.unitsNeeded, item.packageId, item.quantity, item.unitsNeeded));
           }
-          statements.push(env.DB.prepare(`
-            INSERT INTO reseller_stock_order_items
-              (reseller_stock_order_id, reseller_product_id, package_id, package_label, product_name, product_sku, quantity, wholesale_unit_price, customer_unit_price, reseller_unit_share, line_total, currency, units_per_package)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(created.id, item.productId, item.packageId, orderType === "mixed" ? item.pkg.package_label + " (individual units)" : item.pkg.package_label, item.pkg.name + " — " + item.pkg.package_label + (orderType === "mixed" ? " (individual units)" : ""), item.pkg.sku || "", item.quantity, item.wholesale, item.customerPrice, item.resellerShare, item.lineTotal, item.pkg.currency || "ZAR", item.itemUnitsPerPackage));
+          statements.push(env.DB.prepare("INSERT INTO reseller_stock_order_items (reseller_stock_order_id, reseller_product_id, package_id, package_label, product_name, product_sku, quantity, wholesale_unit_price, customer_unit_price, reseller_unit_share, line_total, currency, units_per_package) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(created.id, item.productId, item.packageId, item.itemType === "mixed" ? item.pkg.package_label + " (individual units)" : item.pkg.package_label, item.pkg.name + " — " + item.pkg.package_label + (item.itemType === "mixed" ? " (individual units)" : ""), item.pkg.sku || "", item.quantity, item.wholesale, item.customerPrice, item.resellerShare, item.lineTotal, item.pkg.currency || "ZAR", item.itemUnitsPerPackage));
         }
         statements.push(env.DB.prepare("UPDATE reseller_stock_orders SET stock_reserved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(created.id));
         await env.DB.batch(statements);
@@ -196,7 +192,7 @@ export async function handleResellerPortal(request, env) {
         await env.DB.prepare("DELETE FROM reseller_stock_orders WHERE id = ?").bind(created.id).run();
         throw error;
       }
-      return json({ success: true, data: { id: created.id, order_number: orderNumber, order_type: orderType, total_amount: total, currency, fulfilment_mode: fulfilmentMode, payment_status: "pending", order_status: "submitted" } }, 201);
+      return json({ success: true, data: { id: created.id, order_number: orderNumber, total_amount: total, currency, fulfilment_mode: fulfilmentMode, payment_status: "pending", order_status: "submitted" } }, 201);
     }
     if (action === "ledger") {
       const reseller = await getReseller(token, env);
