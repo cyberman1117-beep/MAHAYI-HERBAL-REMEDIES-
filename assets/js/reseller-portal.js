@@ -355,7 +355,6 @@ $("[data-logout]").addEventListener("click", async () => { await signOut(auth); 
 document.querySelectorAll("[data-refresh]").forEach((button) => button.addEventListener("click", loadAccount));
 $("#refresh-sales").addEventListener("click", loadSales);
 $("#refresh-ledger").addEventListener("click", loadLedger);
-$("#pay-later-mode").addEventListener("change", renderCart);
 $("#record-sale").addEventListener("click", async () => {
   const items = renderSaleCart(); if (!items.length) return;
   const button = $("#record-sale"); button.disabled = true; $("#sale-cart-status").textContent = "Recording customer sale…";
