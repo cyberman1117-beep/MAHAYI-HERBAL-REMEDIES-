@@ -59,7 +59,7 @@ async function stockOrders(request, env, id) {
       ORDER BY o.created_at DESC, o.id DESC
     `).all();
     const itemResult = await env.DB.prepare(`
-      SELECT i.reseller_stock_order_id, i.product_name, i.package_label, i.product_sku, i.quantity, i.wholesale_unit_price,
+      SELECT i.reseller_stock_order_id, i.product_name, i.package_label, i.product_sku, i.quantity, i.units_per_package, i.wholesale_unit_price,
              i.line_total, i.currency
       FROM reseller_stock_order_items i ORDER BY i.reseller_stock_order_id DESC, i.id
     `).all();
@@ -104,11 +104,12 @@ async function stockOrders(request, env, id) {
   }
   const statements = [];
   if (orderStatus === "fulfilled" && !existing.inventory_applied_at) {
-    const items = await env.DB.prepare("SELECT reseller_product_id, package_id, package_label, product_name, quantity FROM reseller_stock_order_items WHERE reseller_stock_order_id = ?").bind(id).all();
+    const items = await env.DB.prepare("SELECT reseller_product_id, package_id, package_label, product_name, quantity, units_per_package FROM reseller_stock_order_items WHERE reseller_stock_order_id = ?").bind(id).all();
     if (!items.results?.length) return json({ success: false, error: "Cannot fulfil an empty stock order." }, 409);
     for (const item of items.results) {
       if (!item.reseller_product_id || !item.package_id) return json({ success: false, error: "A package in this order is no longer available. Inventory was not changed." }, 409);
-      const creditQuantity = creditIssue ? item.quantity : 0;
+      const unitQuantity = Number(item.quantity) * Number(item.units_per_package || 1);
+      const creditQuantity = creditIssue ? unitQuantity : 0;
       const movementType = creditIssue ? "pay_later_issue" : "stock_purchase";
       statements.push(env.DB.prepare(`
         INSERT INTO reseller_package_inventory (reseller_id, package_id, quantity_available, pay_later_quantity)
@@ -117,12 +118,12 @@ async function stockOrders(request, env, id) {
           quantity_available = reseller_package_inventory.quantity_available + excluded.quantity_available,
           pay_later_quantity = reseller_package_inventory.pay_later_quantity + excluded.pay_later_quantity,
           updated_at = CURRENT_TIMESTAMP
-      `).bind(existing.reseller_id, item.package_id, item.quantity, creditQuantity));
+      `).bind(existing.reseller_id, item.package_id, unitQuantity, creditQuantity));
       statements.push(env.DB.prepare(`
         INSERT INTO reseller_inventory_movements
           (reseller_id, reseller_product_id, package_id, movement_type, quantity_change, reference_type, reference_id, notes)
         VALUES (?, ?, ?, ?, ?, 'stock_order', ?, ?)
-      `).bind(existing.reseller_id, item.reseller_product_id, item.package_id, movementType, item.quantity, id, "Stock order " + existing.order_number + " — " + item.product_name + " (" + item.package_label + ")"));
+      `).bind(existing.reseller_id, item.reseller_product_id, item.package_id, movementType, unitQuantity, id, "Stock order " + existing.order_number + " — " + item.product_name + " (" + item.package_label + ")"));
     }
     statements.push(env.DB.prepare(`
       UPDATE reseller_stock_orders SET payment_status = ?, order_status = ?, payment_reference = ?,
