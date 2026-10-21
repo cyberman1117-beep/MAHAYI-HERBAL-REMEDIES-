@@ -13,6 +13,70 @@ function money(value, currency = "ZAR") {
   catch { return "R" + Number(value || 0).toFixed(2); }
 }
 function setStatus(message) { $("#catalogue-status").textContent = message; }
+const CART_KEYS = { packages: "mhr_reseller_package_cart", mixed: "mhr_reseller_mixed_cart" };
+function readCartMap(key) {
+  try { const value = JSON.parse(localStorage.getItem(key) || "{}"); return new Map(Object.entries(value).map(([id,qty]) => [Number(id),Number(qty)]).filter(([id,qty]) => Number.isSafeInteger(id) && Number.isSafeInteger(qty) && id > 0 && qty > 0)); }
+  catch { return new Map(); }
+}
+function writeCartMap(key, map) { localStorage.setItem(key, JSON.stringify(Object.fromEntries(map))); updateCartLink(); }
+function updateCartLink() {
+  const link = $("#catalogue-cart-link"); if (!link) return;
+  const full = readCartMap(CART_KEYS.packages), units = readCartMap(CART_KEYS.mixed);
+  link.textContent = "Cart (" + (full.size + units.size) + ")";
+}
+function showCartMessage(message) {
+  const status = $("#catalogue-cart-status");
+  if (status) status.textContent = message;
+  updateCartLink();
+}
+function addFullPackageToCart(pkg, quantity) {
+  const id = Number(pkg.package_id || pkg.id), full = readCartMap(CART_KEYS.packages), mixed = readCartMap(CART_KEYS.mixed);
+  const unitsPerPackage = Number(pkg.units_per_package || 1);
+  const stockUnits = Number(pkg.stock_units_available ?? Number(pkg.stock_quantity || 0) * unitsPerPackage);
+  const alreadyNeeded = (full.get(id) || 0) * unitsPerPackage + (mixed.get(id) || 0);
+  if (!Number.isSafeInteger(quantity) || quantity < Number(pkg.minimum_order_quantity || 1)) return "Choose a whole package quantity that meets the minimum.";
+  if (alreadyNeeded + quantity * unitsPerPackage > stockUnits) return "That quantity exceeds the remaining stock. Check your cart and try again.";
+  full.set(id, (full.get(id) || 0) + quantity); writeCartMap(CART_KEYS.packages, full);
+  return quantity + " full package(s) added to your cart. You can keep shopping.";
+}
+function openMixedBuilder(product) {
+  const box = $("#catalogue-mixed-builder-options"); if (!box) return;
+  box.replaceChildren();
+  const full = readCartMap(CART_KEYS.packages), mixed = readCartMap(CART_KEYS.mixed);
+  const section = document.createElement("section"); section.className = "mixed-builder-product";
+  const heading = document.createElement("div"); heading.className = "mixed-builder-product-heading";
+  const title = document.createElement("h3"); title.textContent = product.name;
+  const intro = document.createElement("p"); intro.textContent = "Choose individual units for each size. Your selection will be added to the shared cart.";
+  heading.append(title,intro); section.append(heading);
+  const options = (product.packages || []).filter(pkg => Number(pkg.is_enabled) === 1);
+  for (const pkg of options) {
+    const id = Number(pkg.package_id || pkg.id), unitsPerPackage = Number(pkg.units_per_package || 1);
+    const stockUnits = Number(pkg.stock_units_available ?? Number(pkg.stock_quantity || 0) * unitsPerPackage);
+    const remaining = Math.max(0, stockUnits - (full.get(id) || 0) * unitsPerPackage - (mixed.get(id) || 0));
+    if (!remaining) continue;
+    const row = document.createElement("label"); row.className = "mixed-builder-option";
+    const info = document.createElement("span"); info.className = "mixed-builder-option-info";
+    const name = document.createElement("strong"); name.className = "mixed-builder-option-name"; name.textContent = pkg.package_label;
+    const price = document.createElement("span"); price.className = "mixed-builder-option-price"; price.textContent = money(pkg.stock_unit_price, product.currency) + " per unit";
+    const stock = document.createElement("span"); stock.className = "mixed-builder-option-stock"; stock.textContent = remaining + " individual units available for your cart";
+    info.append(name,price,stock);
+    const qwrap = document.createElement("span"); qwrap.className = "mixed-builder-quantity-wrap";
+    const qlabel = document.createElement("span"); qlabel.className = "mixed-builder-quantity-label"; qlabel.textContent = "Quantity";
+    const input = document.createElement("input"); input.className = "mixed-builder-quantity"; input.type = "number"; input.min = "0"; input.max = String(remaining); input.step = "1"; input.inputMode = "numeric"; input.value = "0"; input.dataset.packageId = String(id); input.dataset.price = String(pkg.stock_unit_price || 0); input.dataset.max = String(remaining); input.setAttribute("aria-label",product.name+" "+pkg.package_label+" individual unit quantity");
+    qwrap.append(qlabel,input); row.append(info,qwrap); section.append(row);
+  }
+  if (!section.querySelector("input")) { const empty = document.createElement("p"); empty.className = "mixed-builder-empty"; empty.textContent = "No individual units remain available for this product."; section.append(empty); }
+  box.append(section); updateCatalogueMixedSummary();
+  $("#catalogue-mixed-builder-status").textContent = "Minimum order: 10 individual units combined across your cart before checkout.";
+  const dialog = $("#catalogue-mixed-builder-dialog"); if (dialog.showModal) dialog.showModal(); else dialog.setAttribute("open","");
+}
+function updateCatalogueMixedSummary() {
+  const inputs = [...($("#catalogue-mixed-builder-options")?.querySelectorAll("input[data-package-id]") || [])];
+  const units = inputs.reduce((sum,input) => sum + Math.max(0,Number(input.value)||0),0);
+  const total = inputs.reduce((sum,input) => sum + Math.max(0,Number(input.value)||0) * Number(input.dataset.price || 0),0);
+  const summary = $("#catalogue-mixed-builder-summary"); if (summary) summary.textContent = units + " individual unit" + (units === 1 ? "" : "s") + " selected · Estimated subtotal " + money(total);
+  const button = $("#catalogue-add-mixed-to-cart"); if (button) button.disabled = units === 0;
+}
 async function api(action) {
   if (!auth.currentUser) throw new Error("Please sign in to continue.");
   const token = await auth.currentUser.getIdToken();
@@ -72,7 +136,7 @@ function renderList() {
     }
     table.append(tbody); const wrap = document.createElement("div"); wrap.style.overflowX = "auto"; wrap.append(table);
     const button = document.createElement("button"); button.className = "button button-primary"; button.type = "button"; button.textContent = "View product"; button.addEventListener("click", () => openProduct(product));
-    const mixedButton = document.createElement("button"); mixedButton.className = "button button-outline"; mixedButton.type = "button"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => { const destination = new URL("../cart/", location.href); destination.searchParams.set("mixed_product", String(product.id)); location.href = destination.href; });
+    const mixedButton = document.createElement("button"); mixedButton.className = "button button-outline"; mixedButton.type = "button"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => openMixedBuilder(product));
     card.append(marker, details, wrap, button, mixedButton); list.append(card);
   }
 }
@@ -111,7 +175,7 @@ function renderRoute() {
   thead.append(header); table.append(thead);
   const tbody = document.createElement("tbody");
   const enabledPackages = (product.packages || []).filter((item) => Number(item.is_enabled) === 1);
-  const mixedButton = document.createElement("button"); mixedButton.type = "button"; mixedButton.className = "button button-outline"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => { const destination = new URL("../cart/", location.href); destination.searchParams.set("mixed_product", String(product.id)); location.href = destination.href; });
+  const mixedButton = document.createElement("button"); mixedButton.type = "button"; mixedButton.className = "button button-outline"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => openMixedBuilder(product));
   $("#detail-information").append(mixedButton);
   for (const pkg of enabledPackages) {
     const row = document.createElement("tr");
@@ -126,10 +190,7 @@ function renderRoute() {
       const quantity = Number(qty.value);
       if (!Number.isSafeInteger(quantity) || quantity < Number(pkg.minimum_order_quantity || 1)) { qty.focus(); return; }
       if (quantity > Number(pkg.stock_quantity)) { qty.focus(); order.textContent = "Not enough stock"; return; }
-      const destination = new URL("../cart/", location.href);
-      destination.searchParams.set("order_package", String(pkg.package_id || pkg.id));
-      destination.searchParams.set("quantity", String(quantity));
-      location.href = destination.href;
+      showCartMessage(addFullPackageToCart(pkg, quantity));
     });
     actionCell.append(order); row.append(actionCell); tbody.append(row);
   }
@@ -138,6 +199,7 @@ function renderRoute() {
   const instruction = document.createElement("p"); instruction.className = "settings-notice";
   instruction.textContent = enabledPackages.length ? "Choose a stock package to add it to your cart, or select “Choose individual units” to build a mixed-size order. All orders go through your cart and checkout." : "No package options are available for this product yet.";
   $("#detail-information").append(instruction);
+  const cartStatus = document.createElement("p"); cartStatus.id = "catalogue-cart-status"; cartStatus.className = "settings-notice"; cartStatus.setAttribute("role","status"); cartStatus.textContent = "Add items to your cart, then continue browsing or open your cart when ready."; $("#detail-information").append(cartStatus);
   $("#dashboard-product-link").href = "../index.html";
 }
 async function loadCatalogue() {
@@ -169,6 +231,17 @@ async function loadCatalogue() {
   }
 }
 $("#catalogue-search").addEventListener("input", renderList);
+$("#catalogue-mixed-builder-options").addEventListener("input",event=>{if(event.target.matches("input[data-package-id]"))updateCatalogueMixedSummary();});
+$("#catalogue-add-mixed-to-cart").addEventListener("click",()=>{
+  const inputs=[...$("#catalogue-mixed-builder-options").querySelectorAll("input[data-package-id]")];
+  const chosen=inputs.filter(input=>Number(input.value)>0);
+  for(const input of chosen){const q=Number(input.value),max=Number(input.dataset.max);if(!Number.isSafeInteger(q)||q<0||q>max){$("#catalogue-mixed-builder-status").textContent="Use whole-number quantities within the available stock.";return;}}
+  if(!chosen.length){$("#catalogue-mixed-builder-status").textContent="Choose at least one individual unit.";return;}
+  const mixed=readCartMap(CART_KEYS.mixed);
+  for(const input of chosen){const id=Number(input.dataset.packageId);mixed.set(id,(mixed.get(id)||0)+Number(input.value));}
+  writeCartMap(CART_KEYS.mixed,mixed);$("#catalogue-mixed-builder-dialog").close();showCartMessage("Individual units added to your cart. You can continue shopping."); 
+});
+updateCartLink();
 $("#refresh-catalogue").addEventListener("click", loadCatalogue);
 window.addEventListener("popstate", renderRoute);
 onAuthStateChanged(auth, (user) => {
