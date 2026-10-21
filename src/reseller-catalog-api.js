@@ -64,7 +64,7 @@ async function products(request, env, method, id) {
       FROM reseller_products p
       LEFT JOIN reseller_categories c ON c.id = p.category_id
       ORDER BY p.sort_order, p.name, p.id`).all();
-    const packages = await env.DB.prepare(`SELECT id, reseller_product_id, package_label, stock_amount, resale_amount, commission, stock_quantity, minimum_order_quantity, is_enabled, sort_order, created_at, updated_at
+    const packages = await env.DB.prepare(`SELECT id, reseller_product_id, package_label, units_per_package, stock_amount, resale_amount, commission, stock_quantity, minimum_order_quantity, is_enabled, sort_order, created_at, updated_at
       FROM reseller_product_packages ORDER BY reseller_product_id, sort_order, id`).all();
     const byProduct = new Map();
     for (const pkg of packages.results || []) {
@@ -121,6 +121,7 @@ async function products(request, env, method, id) {
   for (let index = 0; index < body.packages.length; index++) {
     const row = body.packages[index] || {};
     const label = text(row.package_label);
+    const unitsPerPackage = integer(row.units_per_package, 1) || 1;
     const stockAmount = amount(row.stock_amount);
     const resaleAmount = amount(row.resale_amount);
     const commission = amount(row.commission);
@@ -132,7 +133,7 @@ async function products(request, env, method, id) {
     }
     const packageStock = integer(row.stock_quantity, 0);
     const minimum = integer(row.minimum_order_quantity, 1) || 1;
-    packageRows.push({ id: positiveId(row.id), package_label: label, stock_amount: stockAmount, resale_amount: resaleAmount, commission, stock_quantity: packageStock, minimum_order_quantity: minimum, is_enabled: row.is_enabled === false || row.is_enabled === 0 ? 0 : 1, sort_order: integer(row.sort_order, index) });
+    packageRows.push({ id: positiveId(row.id), package_label: label, units_per_package: unitsPerPackage, stock_amount: stockAmount, resale_amount: resaleAmount, commission, stock_quantity: packageStock, minimum_order_quantity: minimum, is_enabled: row.is_enabled === false || row.is_enabled === 0 ? 0 : 1, sort_order: integer(row.sort_order, index) });
   }
   let productId = id;
   if (method === "POST") {
@@ -151,11 +152,11 @@ async function products(request, env, method, id) {
       const owns = (existingRows.results || []).some((x) => Number(x.id) === row.id);
       if (!owns) return response({ success: false, error: "A package row does not belong to this product. Refresh and try again." }, 400);
       keepIds.add(row.id);
-      statements.push(env.DB.prepare(`UPDATE reseller_product_packages SET package_label = ?, stock_amount = ?, resale_amount = ?, commission = ?, stock_quantity = ?, minimum_order_quantity = ?, is_enabled = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND reseller_product_id = ?`)
-        .bind(row.package_label, row.stock_amount, row.resale_amount, row.commission, row.stock_quantity, row.minimum_order_quantity, row.is_enabled, row.sort_order, row.id, productId));
+      statements.push(env.DB.prepare(`UPDATE reseller_product_packages SET package_label = ?, units_per_package = ?, stock_amount = ?, resale_amount = ?, commission = ?, stock_quantity = ?, minimum_order_quantity = ?, is_enabled = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND reseller_product_id = ?`)
+        .bind(row.package_label, row.units_per_package, row.stock_amount, row.resale_amount, row.commission, row.stock_quantity, row.minimum_order_quantity, row.is_enabled, row.sort_order, row.id, productId));
     } else {
-      statements.push(env.DB.prepare(`INSERT INTO reseller_product_packages (reseller_product_id, package_label, stock_amount, resale_amount, commission, stock_quantity, minimum_order_quantity, is_enabled, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(productId, row.package_label, row.stock_amount, row.resale_amount, row.commission, row.stock_quantity, row.minimum_order_quantity, row.is_enabled, row.sort_order));
+      statements.push(env.DB.prepare(`INSERT INTO reseller_product_packages (reseller_product_id, package_label, units_per_package, stock_amount, resale_amount, commission, stock_quantity, minimum_order_quantity, is_enabled, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(productId, row.package_label, row.units_per_package, row.stock_amount, row.resale_amount, row.commission, row.stock_quantity, row.minimum_order_quantity, row.is_enabled, row.sort_order));
     }
   }
   for (const row of existingRows.results || []) {
