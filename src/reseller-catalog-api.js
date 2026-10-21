@@ -152,11 +152,11 @@ async function products(request, env, method, id) {
       const owns = (existingRows.results || []).some((x) => Number(x.id) === row.id);
       if (!owns) return response({ success: false, error: "A package row does not belong to this product. Refresh and try again." }, 400);
       keepIds.add(row.id);
-      statements.push(env.DB.prepare(`UPDATE reseller_product_packages SET package_label = ?, units_per_package = ?, stock_amount = ?, resale_amount = ?, commission = ?, stock_quantity = ?, minimum_order_quantity = ?, is_enabled = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND reseller_product_id = ?`)
-        .bind(row.package_label, row.units_per_package, row.stock_amount, row.resale_amount, row.commission, row.stock_quantity, row.minimum_order_quantity, row.is_enabled, row.sort_order, row.id, productId));
+      statements.push(env.DB.prepare(`UPDATE reseller_product_packages SET package_label = ?, units_per_package = ?, stock_amount = ?, resale_amount = ?, commission = ?, stock_quantity = ?, stock_units_available = CASE WHEN stock_quantity != ? OR units_per_package != ? THEN ? * ? ELSE stock_units_available END, minimum_order_quantity = ?, is_enabled = ?, sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND reseller_product_id = ?`)
+        .bind(row.package_label, row.units_per_package, row.stock_amount, row.resale_amount, row.commission, row.stock_quantity, row.stock_quantity, row.units_per_package, row.stock_quantity, row.units_per_package, row.minimum_order_quantity, row.is_enabled, row.sort_order, row.id, productId));
     } else {
-      statements.push(env.DB.prepare(`INSERT INTO reseller_product_packages (reseller_product_id, package_label, units_per_package, stock_amount, resale_amount, commission, stock_quantity, minimum_order_quantity, is_enabled, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(productId, row.package_label, row.units_per_package, row.stock_amount, row.resale_amount, row.commission, row.stock_quantity, row.minimum_order_quantity, row.is_enabled, row.sort_order));
+      statements.push(env.DB.prepare(`INSERT INTO reseller_product_packages (reseller_product_id, package_label, units_per_package, stock_amount, resale_amount, commission, stock_quantity, stock_units_available, minimum_order_quantity, is_enabled, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(productId, row.package_label, row.units_per_package, row.stock_amount, row.resale_amount, row.commission, row.stock_quantity, row.stock_quantity * row.units_per_package, row.minimum_order_quantity, row.is_enabled, row.sort_order));
     }
   }
   for (const row of existingRows.results || []) {
