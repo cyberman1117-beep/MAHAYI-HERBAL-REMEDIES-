@@ -149,12 +149,17 @@ function renderProducts(data) {
       if (Number(pkg.stock_quantity) < Number(pkg.minimum_order_quantity || 1)) { add.disabled = true; add.textContent = "Out of stock"; }
       add.addEventListener("click", () => {
         const quantity = Number(qty.value), id = Number(pkg.package_id);
-        if (!Number.isSafeInteger(quantity) || quantity < Number(pkg.minimum_order_quantity || 1)) { $("#cart-status").textContent = "Enter a whole-number quantity that meets this package’s minimum order."; return; }
-        if (quantity + (cart.get(id) || 0) > Number(pkg.stock_quantity)) { $("#cart-status").textContent = "That package quantity is not currently available."; return; }
-        let saved = {}; try { saved = JSON.parse(localStorage.getItem("mhr_reseller_package_cart") || "{}"); } catch {}
+        const status = $("#stock-cart-status");
+        if (!Number.isSafeInteger(quantity) || quantity < Number(pkg.minimum_order_quantity || 1)) { if(status)status.textContent = "Enter a whole-number quantity that meets this package’s minimum order."; return; }
+        let saved = {}; let mixedSaved = {};
+        try { saved = JSON.parse(localStorage.getItem("mhr_reseller_package_cart") || "{}"); } catch {}
+        try { mixedSaved = JSON.parse(localStorage.getItem("mhr_reseller_mixed_cart") || "{}"); } catch {}
+        const units = Number(pkg.units_per_package || 1), availableUnits = Number(pkg.stock_units_available ?? Number(pkg.stock_quantity || 0) * units);
+        const alreadyNeeded = Number(saved[id] || 0) * units + Number(mixedSaved[id] || 0);
+        if (alreadyNeeded + quantity * units > availableUnits) { if(status)status.textContent = "That quantity exceeds the remaining stock. Check your cart and try again."; return; }
         saved[id] = Number(saved[id] || 0) + quantity;
         localStorage.setItem("mhr_reseller_package_cart", JSON.stringify(saved));
-        const cartUrl = new URL("cart/", location.href); cartUrl.searchParams.set("added", "1"); location.href = cartUrl.href;
+        if(status)status.textContent = quantity + " full package(s) added to your cart. You can keep browsing or open your cart when ready.";
       });
       const addSale = document.createElement("button"); addSale.className = "button button-outline"; addSale.type = "button"; addSale.textContent = "Record sale"; addSale.style.marginTop = ".35rem";
       if (Number(pkg.reseller_stock_quantity || 0) < 1) { addSale.disabled = true; addSale.textContent = "No stock"; }
@@ -174,7 +179,7 @@ function renderProducts(data) {
     const summary = document.createElement("summary"); summary.textContent = "Package options and actions";
     const wrap = document.createElement("div"); wrap.className = "reseller-dashboard-package-table"; wrap.append(table);
     options.append(summary, wrap);
-    const mixedButton = document.createElement("button"); mixedButton.className = "button button-outline reseller-dashboard-mixed-button"; mixedButton.type = "button"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => openMixedBuilder(product.id));
+    const mixedButton = document.createElement("button"); mixedButton.className = "button button-outline reseller-dashboard-mixed-button"; mixedButton.type = "button"; mixedButton.textContent = "Choose individual units"; mixedButton.addEventListener("click", () => { const destination = new URL("catalog/", location.href); destination.searchParams.set("product", String(product.id)); location.href = destination.href; });
     card.append(marker, details, options, mixedButton); list.append(card);
   }
 }
