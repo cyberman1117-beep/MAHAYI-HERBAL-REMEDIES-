@@ -188,7 +188,7 @@ export async function handleResellerPortal(request, env) {
             INSERT INTO reseller_stock_order_items
               (reseller_stock_order_id, reseller_product_id, package_id, package_label, product_name, product_sku, quantity, wholesale_unit_price, customer_unit_price, reseller_unit_share, line_total, currency, units_per_package)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(created.id, item.productId, item.packageId, item.pkg.package_label, item.pkg.name + " — " + item.pkg.package_label, item.pkg.sku || "", item.quantity, item.wholesale, item.customerPrice, item.resellerShare, item.lineTotal, item.pkg.currency || "ZAR", item.itemUnitsPerPackage));
+          `).bind(created.id, item.productId, item.packageId, orderType === "mixed" ? item.pkg.package_label + " (individual units)" : item.pkg.package_label, item.pkg.name + " — " + item.pkg.package_label + (orderType === "mixed" ? " (individual units)" : ""), item.pkg.sku || "", item.quantity, item.wholesale, item.customerPrice, item.resellerShare, item.lineTotal, item.pkg.currency || "ZAR", item.itemUnitsPerPackage));
         }
         statements.push(env.DB.prepare("UPDATE reseller_stock_orders SET stock_reserved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(created.id));
         await env.DB.batch(statements);
