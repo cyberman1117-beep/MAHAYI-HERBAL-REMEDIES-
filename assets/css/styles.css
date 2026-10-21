@@ -894,3 +894,45 @@ body.customer-sticky-chat-open{overflow:hidden}
     aspect-ratio: 1 / 1;
   }
 }
+
+
+/* Reseller mixed-unit order builder */
+.mixed-builder-dialog { width:min(680px,calc(100vw - 28px)); max-width:none; max-height:min(86dvh,820px); margin:auto; padding:0; overflow:auto; border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); color:var(--color-text); box-shadow:0 24px 80px rgb(20 20 20 / .3); }
+.mixed-builder-dialog::backdrop { background:rgb(20 20 20 / .58); backdrop-filter:blur(3px); }
+.mixed-builder-header { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-4); padding:var(--space-6); border-bottom:1px solid var(--color-border); background:linear-gradient(135deg,var(--color-surface) 0%,#f5f1eb 100%); }
+.mixed-builder-header h2 { margin:0 0 var(--space-2); font-size:clamp(1.35rem,4vw,1.8rem); line-height:1.2; }
+.mixed-builder-header p { margin:var(--space-2) 0 0; }
+.mixed-builder-close { white-space:nowrap; padding:.55rem .9rem; }
+.mixed-builder-rule { display:grid; gap:var(--space-1); margin:var(--space-4) var(--space-6) 0; padding:var(--space-3) var(--space-4); border:1px solid var(--color-border); border-left:4px solid var(--color-brand-secondary); border-radius:var(--radius-md); background:var(--color-surface-muted); }
+.mixed-builder-rule strong { font-size:var(--font-size-sm); }
+.mixed-builder-rule span { color:var(--color-text-muted); font-size:var(--font-size-sm); line-height:1.45; }
+.mixed-builder-options { display:grid; gap:var(--space-4); padding:var(--space-4) var(--space-6); }
+.mixed-builder-product { min-width:0; padding:var(--space-4); border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); }
+.mixed-builder-product-heading { margin-bottom:var(--space-3); }
+.mixed-builder-product-heading h3 { margin:0; font-size:var(--font-size-lg); }
+.mixed-builder-product-heading p { margin:var(--space-1) 0 0; color:var(--color-text-muted); font-size:var(--font-size-sm); }
+.mixed-builder-option { display:grid; grid-template-columns:minmax(0,1fr) 96px; align-items:center; gap:var(--space-3); padding:var(--space-3) 0; border-top:1px solid var(--color-border); }
+.mixed-builder-option-info { display:grid; gap:3px; min-width:0; }
+.mixed-builder-option-name { font-size:var(--font-size-sm); }
+.mixed-builder-option-price { font-size:var(--font-size-sm); font-weight:var(--font-weight-semibold); color:var(--color-brand-primary); }
+.mixed-builder-option-stock { color:var(--color-text-muted); font-size:var(--font-size-xs); }
+.mixed-builder-quantity-wrap { display:grid; gap:var(--space-1); }
+.mixed-builder-quantity-label { color:var(--color-text-muted); font-size:var(--font-size-xs); }
+.mixed-builder-quantity { width:100%; min-width:0; padding:.65rem .5rem; border:1px solid var(--color-border-strong); border-radius:var(--radius-sm); background:var(--color-surface); color:var(--color-text); font:inherit; text-align:center; }
+.mixed-builder-quantity:focus-visible { outline:2px solid var(--color-brand-secondary); outline-offset:2px; }
+.mixed-builder-empty { margin:0; color:var(--color-text-muted); font-size:var(--font-size-sm); }
+.mixed-builder-dialog #mixed-builder-status { margin:0; padding:0 var(--space-6) var(--space-3); }
+.mixed-builder-footer { position:sticky; bottom:0; display:grid; gap:var(--space-3); padding:var(--space-4) var(--space-6); border-top:1px solid var(--color-border); background:var(--color-surface); box-shadow:0 -8px 20px rgb(20 20 20 / .05); }
+.mixed-builder-summary { margin:0; font-size:var(--font-size-sm); font-weight:var(--font-weight-semibold); }
+.mixed-builder-footer .button { width:100%; }
+.mixed-builder-footer .button:disabled { cursor:not-allowed; opacity:.5; transform:none; }
+@media (max-width:600px) {
+ .mixed-builder-dialog { width:calc(100vw - 16px); max-height:90dvh; border-radius:var(--radius-md); }
+ .mixed-builder-header { padding:var(--space-4); gap:var(--space-2); }
+ .mixed-builder-rule { margin:var(--space-3) var(--space-4) 0; }
+ .mixed-builder-options { padding:var(--space-3) var(--space-4); gap:var(--space-3); }
+ .mixed-builder-product { padding:var(--space-3); }
+ .mixed-builder-option { grid-template-columns:minmax(0,1fr) 78px; gap:var(--space-2); }
+ .mixed-builder-dialog #mixed-builder-status { padding:0 var(--space-4) var(--space-3); }
+ .mixed-builder-footer { padding:var(--space-3) var(--space-4); }
+}
