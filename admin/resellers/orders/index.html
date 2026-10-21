@@ -157,6 +157,74 @@ body.order-panel-visible{overflow:hidden}
 .payment-status-note{margin:0;padding:10px 12px;border-radius:9px;background:var(--color-surface-muted);font-size:.8rem;color:var(--color-text-muted)}
 @media(max-width:760px){.payment-status-panel{padding:13px}.payment-status-options{grid-template-columns:repeat(2,minmax(0,1fr))}.payment-status-option{min-height:76px;flex-direction:row;align-items:center}.payment-status-option:last-child{grid-column:1/-1}}
 @media(max-width:420px){.payment-status-options{grid-template-columns:1fr}.payment-status-option,.payment-status-option:last-child{grid-column:auto;min-height:0}}
+
+/* Mobile fit corrections for the order list and standalone order detail */
+.mobile-order-reseller,.mobile-order-units{display:none}
+@media(max-width:760px){
+  html,body{max-width:100%;overflow-x:hidden}
+  .admin-main{padding:18px 0 28px}
+  .admin-main>.container{width:calc(100% - 24px);max-width:100%;min-width:0}
+  .settings-heading{align-items:stretch;gap:14px;margin-bottom:18px}
+  .settings-heading>div{min-width:0;width:100%}
+  .settings-heading h1{font-size:clamp(1.6rem,7vw,2.15rem);overflow-wrap:anywhere}
+  .settings-heading>.button{align-self:flex-start;max-width:100%;white-space:normal}
+  .order-metrics{gap:8px;margin:16px 0}
+  .order-metric{min-width:0;padding:12px}
+  .order-metric strong{font-size:clamp(1.15rem,5vw,1.5rem);overflow-wrap:anywhere}
+  .settings-panel{min-width:0;padding:14px}
+  .order-toolbar-actions{align-items:stretch}
+  .order-toolbar-actions>div{min-width:0}
+  .orders-toolbar{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .orders-toolbar label{min-width:0;font-size:.8rem}
+  .orders-toolbar input,.orders-toolbar select{font-size:16px;max-width:100%}
+  .orders-table-wrap{overflow-x:hidden;border-radius:12px}
+  .orders-table{width:100%;min-width:0;table-layout:fixed;font-size:.78rem}
+  .orders-table th,.orders-table td{padding:9px 6px;overflow-wrap:anywhere;white-space:normal}
+  .orders-table th{font-size:.64rem;letter-spacing:0}
+  .orders-table th:nth-child(2),.orders-table td:nth-child(2),.orders-table th:nth-child(5),.orders-table td:nth-child(5){display:none}
+  .mobile-order-reseller,.mobile-order-units{display:block;font-size:.7rem;line-height:1.35}
+  .orders-table th:nth-child(1){width:24%}
+  .orders-table th:nth-child(3){width:25%}
+  .orders-table th:nth-child(4){width:10%}
+  .orders-table th:nth-child(6){width:16%}
+  .orders-table th:nth-child(7){width:15%}
+  .orders-table th:nth-child(8){width:10%}
+  .order-row-open{font-size:.76rem;overflow-wrap:anywhere}
+  .order-badge{font-size:.65rem;padding:4px 6px;white-space:normal;line-height:1.2}
+  .orders-table td .button{font-size:.68rem;padding:7px 8px;white-space:normal;line-height:1.2}
+  .order-detail-page .order-detail-panel{width:100%;max-width:100%;min-width:0;margin:0 0 18px;border-radius:12px}
+  .order-detail-page .order-panel-head{gap:10px;padding:14px;min-width:0}
+  .order-detail-page .order-panel-head>div{flex:1 1 0;min-width:0}
+  .order-detail-page .order-panel-head h2{font-size:clamp(1.25rem,6vw,1.8rem);overflow-wrap:anywhere}
+  .order-detail-page .order-panel-body{padding:10px}
+  .order-detail-page .order-panel-section{padding:12px;min-width:0}
+  .order-detail-page .order-panel-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .order-detail-page .order-panel-field{min-width:0;overflow-wrap:anywhere}
+  .order-detail-page .fulfilment-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .order-detail-page .payment-status-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .order-detail-page .fulfilment-step,.order-detail-page .payment-status-option{min-width:0}
+  .order-detail-page .order-manage-form>*{min-width:0;max-width:100%}
+  .order-detail-page .order-manage-form input,.order-detail-page .order-manage-form textarea{font-size:16px}
+}
+@media(max-width:420px){
+  .admin-main>.container{width:calc(100% - 20px)}
+  .orders-toolbar{grid-template-columns:minmax(0,1fr)}
+  .orders-toolbar label:first-child{grid-column:auto}
+  .order-toolbar-actions .button{width:100%}
+  .orders-table th,.orders-table td{padding:8px 4px}
+  .orders-table{font-size:.72rem}
+  .orders-table th:nth-child(1){width:25%}
+  .orders-table th:nth-child(3){width:25%}
+  .orders-table th:nth-child(4){width:9%}
+  .orders-table th:nth-child(6){width:17%}
+  .orders-table th:nth-child(7){width:15%}
+  .orders-table th:nth-child(8){width:9%}
+  .order-detail-page .order-panel-grid{grid-template-columns:minmax(0,1fr)}
+  .order-detail-page .fulfilment-steps{grid-template-columns:minmax(0,1fr)}
+  .order-detail-page .payment-status-options{grid-template-columns:minmax(0,1fr)}
+  .order-detail-page .fulfilment-step,.order-detail-page .payment-status-option{min-height:0}
+  .order-detail-page .order-panel-head>#order-panel-close{max-width:100%;white-space:normal}
+}
 </style>
 </head>
 <body class="admin-page">
@@ -205,7 +273,7 @@ function labelStatus(v){return String(v||'pending').replaceAll('_',' ');}
 function linesFor(o){return allItems.filter(i=>Number(i.reseller_stock_order_id)===Number(o.id));}
 function totalUnits(lines){return lines.reduce((sum,i)=>sum+(Number(i.quantity)||0)*(Number(i.units_per_package)||1),0);}
 function matches(o,lines){const q=search.value.trim().toLowerCase();const hay=[o.order_number,o.reseller_name,o.reseller_email,o.payment_reference,...lines.map(i=>[i.product_name,i.package_label,i.product_sku].join(' '))].join(' ').toLowerCase();return (!q||hay.includes(q))&&(paymentFilter.value==='all'||String(o.payment_status||'pending').toLowerCase()===paymentFilter.value)&&(statusFilter.value==='all'||String(o.order_status||'submitted').toLowerCase()===statusFilter.value)&&(modeFilter.value==='all'||(modeFilter.value==='pay_later'?'pay_later':'upfront')===(o.fulfilment_mode==='pay_later'?'pay_later':'upfront'));}
-function render(){const filtered=allOrders.filter(o=>matches(o,linesFor(o)));tableBody.replaceChildren();for(const o of filtered){const lines=linesFor(o);const products=lines.length?lines.map(i=>esc(i.product_name)+' <span class="order-cell-sub">'+esc(i.package_label||'Package')+'</span>').join('<span class="order-cell-sub">+ </span>'):'<span class="order-cell-sub">No item details</span>';const packages=lines.reduce((sum,i)=>sum+(Number(i.quantity)||0),0);const tr=document.createElement('tr');if(Number(o.id)===Number(selectedOrderId))tr.classList.add('is-selected');tr.innerHTML='<td><button class="order-row-open" type="button" data-open-order="'+esc(o.id)+'">'+esc(o.order_number||('Order #'+o.id))+'</button><span class="order-cell-sub">'+esc(dateLabel(o.created_at))+'</span></td><td><strong>'+esc(o.reseller_name||'Reseller')+'</strong><span class="order-cell-sub">'+esc(o.reseller_email||'No email')+'</span></td><td>'+products+'</td><td>'+packages+'</td><td><strong>'+totalUnits(lines)+'</strong><span class="order-cell-sub">individual units</span></td><td class="order-amount">'+money(o.total_amount,o.currency)+'</td><td><span class="order-badge '+statusClass(o.payment_status,'payment')+'">'+esc(labelStatus(o.payment_status))+'</span><span class="order-cell-sub"><span class="order-badge '+statusClass(o.order_status,'order')+'">'+esc(labelStatus(o.order_status))+'</span></span></td><td><button class="button button-outline button-small" type="button" data-open-order="'+esc(o.id)+'">View order →</button></td>';tableBody.append(tr);}
+function render(){const filtered=allOrders.filter(o=>matches(o,linesFor(o)));tableBody.replaceChildren();for(const o of filtered){const lines=linesFor(o);const products=lines.length?lines.map(i=>esc(i.product_name)+' <span class="order-cell-sub">'+esc(i.package_label||'Package')+'</span>').join('<span class="order-cell-sub">+ </span>'):'<span class="order-cell-sub">No item details</span>';const packages=lines.reduce((sum,i)=>sum+(Number(i.quantity)||0),0);const tr=document.createElement('tr');if(Number(o.id)===Number(selectedOrderId))tr.classList.add('is-selected');tr.innerHTML='<td><button class="order-row-open" type="button" data-open-order="'+esc(o.id)+'">'+esc(o.order_number||('Order #'+o.id))+'</button><span class="order-cell-sub">'+esc(dateLabel(o.created_at))+'</span><span class="order-cell-sub mobile-order-reseller">'+esc(o.reseller_name||'Reseller')+'</span></td><td class="order-reseller-cell"><strong>'+esc(o.reseller_name||'Reseller')+'</strong><span class="order-cell-sub">'+esc(o.reseller_email||'No email')+'</span></td><td>'+products+'<span class="order-cell-sub mobile-order-units">'+totalUnits(lines)+' individual units</span></td><td>'+packages+'</td><td class="order-units-cell"><strong>'+totalUnits(lines)+'</strong><span class="order-cell-sub">individual units</span></td><td class="order-amount">'+money(o.total_amount,o.currency)+'</td><td><span class="order-badge '+statusClass(o.payment_status,'payment')+'">'+esc(labelStatus(o.payment_status))+'</span><span class="order-cell-sub"><span class="order-badge '+statusClass(o.order_status,'order')+'">'+esc(labelStatus(o.order_status))+'</span></span></td><td><button class="button button-outline button-small" type="button" data-open-order="'+esc(o.id)+'">View order →</button></td>';tableBody.append(tr);}
 if(!filtered.length){const tr=document.createElement('tr');tr.innerHTML='<td colspan="8"><div class="order-empty">'+(allOrders.length?'No orders match your search and filters.':'No reseller stock orders have been received yet.')+'</div></td>';tableBody.append(tr);}
 const count=filtered.length;document.querySelector('#table-count').textContent='Showing '+count+' of '+allOrders.length+' orders';document.querySelector('#metric-new').textContent=allOrders.filter(o=>!['confirmed','processing','ready','fulfilled','cancelled'].includes(String(o.order_status||'submitted').toLowerCase())).length;document.querySelector('#metric-progress').textContent=allOrders.filter(o=>['confirmed','processing','ready'].includes(String(o.order_status||'').toLowerCase())).length;document.querySelector('#metric-payment').textContent=allOrders.filter(o=>String(o.payment_status||'pending').toLowerCase()==='pending').length;document.querySelector('#metric-complete').textContent=allOrders.filter(o=>['fulfilled','cancelled'].includes(String(o.order_status||'').toLowerCase())).length;
 tableBody.querySelectorAll('[data-open-order]').forEach(b=>b.addEventListener('click',()=>{const id=Number(b.dataset.openOrder);location.href=location.pathname+'?order='+encodeURIComponent(id);}));}
