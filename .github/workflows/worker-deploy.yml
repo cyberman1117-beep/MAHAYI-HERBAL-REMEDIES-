@@ -1,4 +1,4 @@
-name: Deploy MAHAYI HERBAL REMEDIES Worker
+name: Validate and deploy MAHAYI HERBAL REMEDIES Worker
 
 on:
   push:
