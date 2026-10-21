@@ -936,3 +936,43 @@ body.customer-sticky-chat-open{overflow:hidden}
  .mixed-builder-dialog #mixed-builder-status { padding:0 var(--space-4) var(--space-3); }
  .mixed-builder-footer { padding:var(--space-3) var(--space-4); }
 }
+
+
+/* Reseller cart: unmistakable distinction between package types */
+.reseller-cart-line {
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ gap:1rem;
+ margin:0 0 1rem;
+ padding:1rem;
+ border:1px solid var(--color-border);
+ border-left:5px solid var(--color-border);
+ border-radius:var(--radius-md);
+ background:var(--color-surface);
+ min-width:0;
+}
+.reseller-cart-line-package { border-left-color:#276749; background:linear-gradient(110deg,#edf7f0 0%,var(--color-surface) 44%); }
+.reseller-cart-line-mixed { border-left-color:#8757a6; background:linear-gradient(110deg,#f5eef9 0%,var(--color-surface) 44%); }
+.reseller-cart-line-details { min-width:0; }
+.reseller-cart-type-badge {
+ display:inline-flex;
+ align-items:center;
+ margin-bottom:.55rem;
+ padding:.3rem .55rem;
+ border-radius:999px;
+ font-size:.72rem;
+ font-weight:800;
+ letter-spacing:.045em;
+ line-height:1.25;
+}
+.reseller-cart-type-badge.is-package { color:#1e5638; background:#d7eddf; border:1px solid #a8d2b7; }
+.reseller-cart-type-badge.is-individual { color:#633b80; background:#eadcf4; border:1px solid #cbb0df; }
+.reseller-cart-line h3 { margin:.1rem 0 .45rem; overflow-wrap:anywhere; }
+.reseller-cart-line-description { margin:.25rem 0; color:var(--color-text-muted); line-height:1.5; }
+.reseller-cart-line-subtotal { margin:.5rem 0 0; font-weight:750; }
+.reseller-cart-remove { flex:0 0 auto; }
+@media(max-width:560px) {
+ .reseller-cart-line { align-items:stretch; flex-direction:column; gap:.8rem; padding:.85rem; }
+ .reseller-cart-remove { align-self:flex-start; }
+}
