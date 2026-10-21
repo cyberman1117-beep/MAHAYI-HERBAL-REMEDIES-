@@ -136,6 +136,7 @@ function initPage(){
   for(const input of inputs){const q=Number(input.value),id=Number(input.dataset.packageId);if(!Number.isSafeInteger(q)||q<0){$("#mixed-builder-status").textContent="Use whole numbers for quantities.";return;}if(q){const f=findPackage(id),available=Number(f.pkg.stock_units_available??Number(f.pkg.stock_quantity)*Number(f.pkg.units_per_package||1));if(q>available){$("#mixed-builder-status").textContent="Selected quantity exceeds available stock.";return;}mixed.set(id,(mixed.get(id)||0)+q);added+=q;}}
   if(!added){$("#mixed-builder-status").textContent="Choose at least one individual unit.";return;}save(keys.mixed,mixed);renderCart();$("#mixed-builder-dialog").close();$("#cart-status").textContent="Individual units added to your cart.";
  });
+ const checkoutButton=$("#proceed-to-checkout");if(checkoutButton)checkoutButton.addEventListener("click",()=>{const hasItems=packages.size>0||mixed.size>0;if(!hasItems){const status=$("#cart-status");if(status)status.textContent="Add at least one item before proceeding to checkout.";return;}go("../checkout/");});
  const continueShopping=$("#continue-shopping");if(continueShopping)continueShopping.addEventListener("click",()=>go("../catalog/"));
  renderCart();
 }
