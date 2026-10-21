@@ -56,7 +56,7 @@ function renderCheckout(){
  const box=$("#checkout-summary");if(!box)return;box.replaceChildren();const isMixed=new URL(location.href).searchParams.get("type")==="mixed";const selected=isMixed?mixed:packages;let total=0,unitCount=0;
  for(const [id,qty] of selected){const f=findPackage(id);if(!f)continue;const units=isMixed?qty:qty*Number(f.pkg.units_per_package||1);const amount=Number(f.pkg.stock_unit_price||0)*units;total+=amount;unitCount+=isMixed?qty:0;const p=document.createElement("p");p.textContent=f.product.name+" — "+f.pkg.package_label+": "+(isMixed?qty+" individual unit(s)":qty+" package(s), "+units+" units")+" · "+money(amount,f.product.currency);box.append(p);}
  if(!selected.size)box.textContent="Your cart is empty. Return to the cart to select stock.";
- if(isMixed&&unitCount<10)$("#confirm-stock-order").disabled=true;
+ $("#confirm-stock-order").disabled = selected.size === 0 || (isMixed && unitCount < 10);
  $("#checkout-total").textContent="Total payable to M.H.R.: "+money(total);
  $("#checkout-order-type").textContent=isMixed?"Mixed individual-unit order · "+unitCount+" units":"Full stock-package order";
  $("#confirm-stock-order").addEventListener("click",submitOrder,{once:true});
