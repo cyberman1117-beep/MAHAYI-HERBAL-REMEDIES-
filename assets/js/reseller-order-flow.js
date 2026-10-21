@@ -28,16 +28,13 @@ function lineRow(product,pkg,quantity,isMixed){
  row.append(h,p,remove);return {row,total,units};
 }
 function renderCart(){
- if(!$("#package-cart-items"))return;
- const box=$("#package-cart-items");box.replaceChildren();let total=0,count=0;
- for(const [id,qty] of packages){const f=findPackage(id);if(!f)continue;const x=lineRow(f.product,f.pkg,qty,false);box.append(x.row);total+=x.total;count+=qty;}
- if(!box.children.length)box.textContent="No full stock packages selected.";
- $("#package-cart-total").textContent="Package subtotal: "+money(total);$("#package-cart-count").textContent=count+" package(s)";
- const mb=$("#mixed-cart-items");mb.replaceChildren();let mixedTotal=0,units=0;
- for(const [id,qty] of mixed){const f=findPackage(id);if(!f)continue;const x=lineRow(f.product,f.pkg,qty,true);mb.append(x.row);mixedTotal+=x.total;units+=qty;}
- if(!mb.children.length)mb.textContent="No individual units selected.";
- $("#mixed-cart-total").textContent="Mixed order subtotal: "+money(mixedTotal)+" · "+units+" individual units";
- $("#checkout-packages").disabled=packages.size===0;$("#checkout-mixed").disabled=units<10;
+ const box=$("#cart-items");if(!box)return;box.replaceChildren();let total=0,packageCount=0,mixedUnits=0;
+ for(const [id,qty] of packages){const f=findPackage(id);if(!f)continue;const x=lineRow(f.product,f.pkg,qty,false);box.append(x.row);total+=x.total;packageCount+=qty;}
+ for(const [id,qty] of mixed){const f=findPackage(id);if(!f)continue;const x=lineRow(f.product,f.pkg,qty,true);box.append(x.row);total+=x.total;mixedUnits+=qty;}
+ if(!box.children.length)box.textContent="Your cart is empty. Browse the catalogue and add products to get started.";
+ $("#cart-total").textContent="Cart total: "+money(total);
+ $("#cart-count").textContent=packageCount+" full package(s) · "+mixedUnits+" individual unit(s)";
+ const checkout=$("#proceed-to-checkout");if(checkout)checkout.disabled=packages.size===0&&mixed.size===0;
 }
 function openBuilder(productId){
  const box=$("#mixed-builder-options");box.replaceChildren();
@@ -77,40 +74,45 @@ function updateMixedBuilderSummary(){
  if(summary)summary.textContent=units+" individual unit"+(units===1?"":"s")+" selected · Estimated subtotal "+money(total);
  const add=$("#add-mixed-to-cart");if(add)add.disabled=units===0;
 }
+function getCartLines(){
+ return [
+  ...[...packages].map(([package_id,quantity])=>({package_id,quantity,item_type:"packages"})),
+  ...[...mixed].map(([package_id,quantity])=>({package_id,quantity,item_type:"mixed"}))
+ ];
+}
 function renderCheckout(){
- const box=$("#checkout-summary");if(!box)return;box.replaceChildren();const isMixed=new URL(location.href).searchParams.get("type")==="mixed";const selected=isMixed?mixed:packages;let total=0,unitCount=0;
- for(const [id,qty] of selected){const f=findPackage(id);if(!f)continue;const units=isMixed?qty:qty*Number(f.pkg.units_per_package||1);const amount=Number(f.pkg.stock_unit_price||0)*units;total+=amount;unitCount+=isMixed?qty:0;const p=document.createElement("p");p.textContent=f.product.name+" — "+f.pkg.package_label+": "+(isMixed?qty+" individual unit(s)":qty+" package(s), "+units+" units")+" · "+money(amount,f.product.currency);box.append(p);}
- if(!selected.size)box.textContent="Your cart is empty. Return to the cart to select stock.";
- $("#confirm-stock-order").disabled = selected.size === 0 || (isMixed && unitCount < 10);
- $("#checkout-total").textContent="Total payable to M.H.R.: "+money(total);
- $("#checkout-order-type").textContent=isMixed?"Mixed individual-unit order · "+unitCount+" units":"Full stock-package order";
- $("#confirm-stock-order").addEventListener("click",submitOrder,{once:true});
+ const box=$("#checkout-summary");if(!box)return;box.replaceChildren();const items=getCartLines();let total=0,mixedUnits=0;
+ for(const item of items){const f=findPackage(item.package_id);if(!f)continue;const isMixed=item.item_type==="mixed";const units=isMixed?item.quantity:item.quantity*Number(f.pkg.units_per_package||1);const amount=Number(f.pkg.stock_unit_price||0)*units;total+=amount;if(isMixed)mixedUnits+=item.quantity;
+  const p=document.createElement("p");p.textContent=f.product.name+" — "+f.pkg.package_label+": "+(isMixed?item.quantity+" individual unit(s)":item.quantity+" full package(s), "+units+" units")+" · "+money(amount,f.product.currency);box.append(p);}
+ if(!items.length)box.textContent="Your cart is empty. Return to the cart to add products.";
+ $("#confirm-stock-order").disabled=!items.length||(mixed.size>0&&mixedUnits<10);
+ $("#checkout-total").textContent="Total for all cart items: "+money(total);
+ $("#checkout-order-type").textContent=items.length+" line item(s)"+(mixedUnits?" · "+mixedUnits+" individual units":"")+(packages.size?" · full packages included":"");
 }
 async function submitOrder(){
- const isMixed=new URL(location.href).searchParams.get("type")==="mixed",selected=isMixed?mixed:packages;
- const items=[...selected].map(([package_id,quantity])=>({package_id,quantity}));const units=items.reduce((n,i)=>n+i.quantity,0);
- if(!items.length||(isMixed&&units<10)){ $("#checkout-status").textContent=isMixed?"A mixed order must contain at least 10 individual units.":"Your cart is empty.";return; }
+ const items=getCartLines(),mixedUnits=items.filter(i=>i.item_type==="mixed").reduce((n,i)=>n+i.quantity,0);
+ if(!items.length||(mixed.size>0&&mixedUnits<10)){ $("#checkout-status").textContent=!items.length?"Your cart is empty.":"Your individual-unit selections must total at least 10 units.";return; }
  const button=$("#confirm-stock-order");button.disabled=true;$("#checkout-status").textContent="Submitting your order…";
  try{
-  const mode=$("#pay-later-mode")?.checked?"pay_later":"upfront";const body={items,fulfilment_mode:mode,reseller_notes:$("#order-note").value};if(isMixed)body.order_type="mixed";
-  const result=await api("stock-orders","POST",body);selected.clear();save(isMixed?keys.mixed:keys.packages,selected);
+  const mode=$("#pay-later-mode")?.checked?"pay_later":"upfront";const body={items,fulfilment_mode:mode,reseller_notes:$("#order-note").value};
+  const result=await api("stock-orders","POST",body);packages.clear();mixed.clear();save(keys.packages,packages);save(keys.mixed,mixed);renderCheckout();
   $("#checkout-status").textContent="Order "+result.data.order_number+" submitted. Total: "+money(result.data.total_amount,result.data.currency)+". "+(mode==="pay_later"?"M.H.R. must approve and release the stock.":"Please arrange payment with M.H.R.; stock is not released until payment is verified.");
   button.hidden=true;$("#back-to-cart").textContent="Return to cart";
- }catch(e){$("#checkout-status").textContent=e.message;button.disabled=false;button.addEventListener("click",submitOrder,{once:true});}
+ }catch(e){$("#checkout-status").textContent=e.message;button.disabled=false;}
 }
 function initPage(){
  const path=location.pathname;
- if(path.includes("/checkout/")){renderCheckout();return;}
+ if(path.includes("/checkout/")){renderCheckout();$("#confirm-stock-order").addEventListener("click",submitOrder);return;}
  const params=new URL(location.href).searchParams,requested=params.get("order_package");
  if(requested){const id=Number(requested),qty=Number(params.get("quantity")||1);const f=findPackage(id);if(f&&Number.isSafeInteger(qty)&&qty>=Number(f.pkg.minimum_order_quantity||1)&&qty<=Number(f.pkg.stock_quantity)){packages.set(id,(packages.get(id)||0)+qty);save(keys.packages,packages);$("#cart-status").textContent="Package added to your cart.";}else $("#cart-status").textContent="Could not add that package. Check stock and try again.";params.delete("order_package");params.delete("quantity");history.replaceState({},"",location.pathname);}
  const mixedProduct=params.get("mixed_product");if(mixedProduct){params.delete("mixed_product");history.replaceState({},"",location.pathname);openBuilder(mixedProduct);}
  $("#open-mixed-builder").addEventListener("click",()=>openBuilder());
  $("#mixed-builder-options").addEventListener("input",event=>{if(event.target.matches("input[data-package-id]"))updateMixedBuilderSummary();});
  $("#add-mixed-to-cart").addEventListener("click",()=>{const inputs=[...$("#mixed-builder-options").querySelectorAll("input[data-package-id]")];let added=0;
-  for(const input of inputs){const q=Number(input.value),id=Number(input.dataset.packageId);if(!Number.isSafeInteger(q)||q<0){$("#mixed-builder-status").textContent="Use whole numbers for quantities.";return;}if(q){const f=findPackage(id),available=Number(f.pkg.stock_units_available??Number(f.pkg.stock_quantity)*Number(f.pkg.units_per_package||1));if(q>available){$("#mixed-builder-status").textContent="Selected quantity exceeds available stock.";return;}mixed.set(id,q);added+=q;}}
-  if(!added){$("#mixed-builder-status").textContent="Choose at least one individual unit.";return;}save(keys.mixed,mixed);renderCart();$("#mixed-builder-dialog").close();$("#cart-status").textContent="Individual units added to cart.";
+  for(const input of inputs){const q=Number(input.value),id=Number(input.dataset.packageId);if(!Number.isSafeInteger(q)||q<0){$("#mixed-builder-status").textContent="Use whole numbers for quantities.";return;}if(q){const f=findPackage(id),available=Number(f.pkg.stock_units_available??Number(f.pkg.stock_quantity)*Number(f.pkg.units_per_package||1));if(q>available){$("#mixed-builder-status").textContent="Selected quantity exceeds available stock.";return;}mixed.set(id,(mixed.get(id)||0)+q);added+=q;}}
+  if(!added){$("#mixed-builder-status").textContent="Choose at least one individual unit.";return;}save(keys.mixed,mixed);renderCart();$("#mixed-builder-dialog").close();$("#cart-status").textContent="Individual units added to your cart.";
  });
- $("#checkout-packages").addEventListener("click",()=>go("../checkout/?type=packages"));$("#checkout-mixed").addEventListener("click",()=>go("../checkout/?type=mixed"));
+ const continueShopping=$("#continue-shopping");if(continueShopping)continueShopping.addEventListener("click",()=>go("../catalog/"));
  renderCart();
 }
 onAuthStateChanged(auth,async user=>{
