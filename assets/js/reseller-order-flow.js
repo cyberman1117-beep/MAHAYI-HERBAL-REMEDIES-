@@ -20,12 +20,19 @@ async function api(action, method="GET", body) {
 function findPackage(id){for(const product of products){const pkg=(product.packages||[]).find(p=>Number(p.package_id||p.id)===Number(id));if(pkg)return {product,pkg};}return null;}
 function go(path){location.href=path;}
 function lineRow(product,pkg,quantity,isMixed){
- const row=document.createElement("article");row.className="admin-panel";
- const h=document.createElement("h3");h.textContent=product.name+" — "+pkg.package_label;
- const p=document.createElement("p");p.className="muted";const units=isMixed?quantity:quantity*Number(pkg.units_per_package||1);const total=Number(pkg.stock_unit_price||0)*units;
- p.textContent=isMixed?quantity+" individual unit(s) × "+money(pkg.stock_unit_price,product.currency)+" = "+money(total,product.currency):quantity+" stock package(s), "+units+" units = "+money(total,product.currency);
- const remove=document.createElement("button");remove.type="button";remove.className="button button-outline";remove.textContent="Remove";remove.addEventListener("click",()=>{(isMixed?mixed:packages).delete(Number(pkg.package_id||pkg.id));save(isMixed?keys.mixed:keys.packages,isMixed?mixed:packages);renderCart();});
- row.append(h,p,remove);return {row,total,units};
+ const row=document.createElement("article");row.className="reseller-cart-line "+(isMixed?"reseller-cart-line-mixed":"reseller-cart-line-package");
+ const details=document.createElement("div");details.className="reseller-cart-line-details";
+ const badge=document.createElement("span");badge.className="reseller-cart-type-badge "+(isMixed?"is-individual":"is-package");badge.textContent=isMixed?"INDIVIDUAL UNITS":"FULL PACKAGE";
+ const h=document.createElement("h3");h.textContent=product.name+" — "+(pkg.package_label||"Stock size");
+ const unitsPerPackage=Math.max(1,Number(pkg.units_per_package||1));const units=isMixed?quantity:quantity*unitsPerPackage;const total=Number(pkg.stock_unit_price||0)*units;
+ const description=document.createElement("p");description.className="reseller-cart-line-description";
+ description.textContent=isMixed
+  ? quantity+" individual unit(s) × "+money(pkg.stock_unit_price,product.currency)+" per unit"
+  : quantity+" full package(s) × "+unitsPerPackage+" unit(s) per package";
+ const subtotal=document.createElement("p");subtotal.className="reseller-cart-line-subtotal";subtotal.textContent="Line subtotal: "+money(total,product.currency);
+ details.append(badge,h,description,subtotal);
+ const remove=document.createElement("button");remove.type="button";remove.className="button button-outline reseller-cart-remove";remove.textContent="Remove item";remove.setAttribute("aria-label","Remove "+(isMixed?"individual units":"full packages")+" of "+product.name+" "+pkg.package_label+" from cart");remove.addEventListener("click",()=>{(isMixed?mixed:packages).delete(Number(pkg.package_id||pkg.id));save(isMixed?keys.mixed:keys.packages,isMixed?mixed:packages);renderCart();});
+ row.append(details,remove);return {row,total,units};
 }
 function renderCart(){
  const box=$("#cart-items");if(!box)return;box.replaceChildren();let total=0,packageCount=0,mixedUnits=0;
