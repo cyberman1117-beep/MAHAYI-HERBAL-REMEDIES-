@@ -232,7 +232,7 @@ export async function handleResellerPortal(request, env) {
       if (request.method === "GET") {
         const orders = await env.DB.prepare(`
           SELECT o.id, o.order_number, o.currency, o.subtotal,
-                 o.reseller_earnings, o.company_earnings, o.payment_status, o.order_status, o.sale_date, o.created_at,
+                 o.reseller_earnings, o.company_earnings, o.payment_status, o.order_status, o.sale_date, o.expected_payment_date, o.customer_notes, o.created_at,
                  COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) AS amount_collected
           FROM reseller_orders o WHERE o.reseller_id = ? ORDER BY o.created_at DESC, o.id DESC LIMIT 100
         `).bind(reseller.id).all();
@@ -309,10 +309,10 @@ export async function handleResellerPortal(request, env) {
       const orderNumber = "MHR-SALE-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + crypto.randomUUID().slice(0,8).toUpperCase();
       const created = await env.DB.prepare(`
         INSERT INTO reseller_orders
-          (order_number, reseller_id, currency, subtotal, reseller_earnings, company_earnings, payment_status, order_status, customer_notes, sale_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'fulfilled', ?, ?)
+          (order_number, reseller_id, currency, subtotal, reseller_earnings, company_earnings, payment_status, order_status, customer_notes, sale_date, expected_payment_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'fulfilled', ?, ?, ?)
         RETURNING id
-      `).bind(orderNumber, reseller.id, currency, subtotal, resellerEarnings, companyEarnings, paymentStatus, clean(body.customer_notes, 2000), saleDate).first();
+      `).bind(orderNumber, reseller.id, currency, subtotal, resellerEarnings, companyEarnings, paymentStatus, clean(body.customer_notes, 2000), saleDate, clean(body.expected_payment_date, 10)).first();
       try {
         const statements = [];
         for (const item of saleItems) {
