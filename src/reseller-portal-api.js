@@ -16,9 +16,22 @@ function errorResponse(error) {
 }
 
 async function getReseller(token, env) {
-  return env.DB.prepare(
-    "SELECT id, firebase_uid, email, full_name, phone, status, approved_at, pay_later_enabled, created_at, residential_street, residential_area, residential_city, residential_province, residential_postal_code, delivery_same_as_residential, delivery_street, delivery_area, delivery_city, delivery_province, delivery_postal_code, delivery_instructions FROM resellers WHERE firebase_uid = ?"
-  ).bind(token.sub).first();
+  const select = "SELECT id, firebase_uid, email, full_name, phone, status, approved_at, pay_later_enabled, created_at, residential_street, residential_area, residential_city, residential_province, residential_postal_code, delivery_same_as_residential, delivery_street, delivery_area, delivery_city, delivery_province, delivery_postal_code, delivery_instructions FROM resellers WHERE firebase_uid = ?";
+  let reseller = await env.DB.prepare(select).bind(token.sub).first();
+  if (reseller) return reseller;
+
+  // Older reseller records may predate Firebase UID linking. After the person
+  // signs in successfully with the same email, attach only an unlinked record.
+  const email = clean(token.email, 254).toLowerCase();
+  if (!email) return null;
+  const existing = await env.DB.prepare(
+    "SELECT id, firebase_uid FROM resellers WHERE lower(email) = ? LIMIT 1"
+  ).bind(email).first();
+  if (!existing || (existing.firebase_uid && existing.firebase_uid !== token.sub)) return null;
+  await env.DB.prepare(
+    "UPDATE resellers SET firebase_uid = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND (firebase_uid IS NULL OR firebase_uid = '')"
+  ).bind(token.sub, existing.id).run();
+  return env.DB.prepare(select).bind(token.sub).first();
 }
 
 export async function handleResellerPortal(request, env) {
@@ -68,8 +81,6 @@ export async function handleResellerPortal(request, env) {
       const body = await request.json();
       const reseller = await getReseller(token, env);
       if (!reseller) return json({ success: false, error: "Create your reseller account first." }, 403);
-      const fullName = clean(body.full_name, 160);
-      const phone = clean(body.phone, 40);
       const residential = {
         street: clean(body.residential_street, 240),
         area: clean(body.residential_area, 120),
@@ -86,16 +97,16 @@ export async function handleResellerPortal(request, env) {
         postal: clean(body.delivery_postal_code, 16)
       };
       const instructions = clean(body.delivery_instructions, 1000);
-      if (!fullName || !phone || Object.values(residential).some(v => !v) || Object.values(delivery).some(v => !v)) {
-        return json({ success: false, error: "Complete your name, phone number, residential address and delivery address before saving." }, 400);
+      if (Object.values(residential).some(v => !v) || Object.values(delivery).some(v => !v)) {
+        return json({ success: false, error: "Complete your residential and delivery addresses before saving." }, 400);
       }
       await env.DB.prepare(`
-        UPDATE resellers SET full_name = ?, phone = ?,
+        UPDATE resellers SET
           residential_street = ?, residential_area = ?, residential_city = ?, residential_province = ?, residential_postal_code = ?,
           delivery_same_as_residential = ?, delivery_street = ?, delivery_area = ?, delivery_city = ?, delivery_province = ?,
           delivery_postal_code = ?, delivery_instructions = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).bind(fullName, phone, residential.street, residential.area, residential.city, residential.province, residential.postal,
+      `).bind(residential.street, residential.area, residential.city, residential.province, residential.postal,
         same ? 1 : 0, delivery.street, delivery.area, delivery.city, delivery.province, delivery.postal, instructions, reseller.id).run();
       return json({ success: true, data: { reseller: await getReseller(token, env) } });
     }
