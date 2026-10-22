@@ -251,7 +251,8 @@ export async function handleResellerPortal(request, env) {
       }
       if (request.method !== "POST") return json({ success: false, error: "Method not allowed." }, 405);
       const body = await request.json();
-      if (!Array.isArray(body.items) || !body.items.length || body.items.length > 50) return json({ success: false, error: "Choose at least one package for this sale." }, 400);
+      if ((!Array.isArray(body.unit_ids) || !body.unit_ids.length) && (!Array.isArray(body.items) || !body.items.length || body.items.length > 50)) return json({ success: false, error: "Select at least one stock item for this sale." }, 400);
+      if (Array.isArray(body.unit_ids) && body.unit_ids.length > 500) return json({ success: false, error: "Record up to 500 individual items per sale." }, 400);
       const quantities = new Map();
       const unitIdsByPackage = new Map();
       if (Array.isArray(body.unit_ids) && body.unit_ids.length) {
