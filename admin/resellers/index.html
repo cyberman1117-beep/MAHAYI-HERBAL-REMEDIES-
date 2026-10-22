@@ -1,7 +1,46 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Manage the independent MAHAYI HERBAL REMEDIES reseller programme."><title>Reseller Programme | MAHAYI HERBAL REMEDIES Admin</title><link rel="stylesheet" href="../../assets/css/styles.css"><script type="module" src="../../assets/js/firebase-auth.js"></script><script src="../../assets/js/site.js" defer></script></head><body class="admin-page"><a class="skip-link" href="#reseller-main">Skip to content</a><header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">MAHAYI HERBAL REMEDIES <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Manage the independent MAHAYI HERBAL REMEDIES reseller programme."><title>Reseller Programme | MAHAYI HERBAL REMEDIES Admin</title><link rel="stylesheet" href="../../assets/css/styles.css"><script type="module" src="../../assets/js/firebase-auth.js"></script><script src="../../assets/js/site.js" defer></script>  <style>
+    .sales-report{margin:0 0 var(--space-8);padding:clamp(16px,3vw,28px);border:1px solid var(--color-border);background:var(--color-surface);min-width:0}
+    .sales-report-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+    .sales-report-head h2{margin-bottom:6px}
+    .sales-report-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .sales-report-tools select{max-width:100%;min-height:42px;padding:8px 12px;border:1px solid var(--color-border-strong);background:var(--color-surface);color:var(--color-text)}
+    .sales-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:22px 0}
+    .sales-kpi{min-width:0;padding:16px;border:1px solid var(--color-border);background:var(--color-background)}
+    .sales-kpi span{display:block;color:var(--color-text-muted);font-size:13px}
+    .sales-kpi strong{display:block;margin-top:8px;font-size:clamp(18px,2.5vw,27px);line-height:1.2;overflow-wrap:anywhere}
+    .sales-chart-wrap{width:100%;min-width:0;overflow:hidden}
+    .sales-chart{display:block;width:100%;height:auto;min-height:180px;overflow:visible}
+    .sales-chart text{font-family:inherit;fill:var(--color-text-muted);font-size:11px}
+    .sales-legend{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0 0;font-size:13px;color:var(--color-text-muted)}
+    .sales-legend span{display:inline-flex;align-items:center;gap:7px}
+    .sales-legend i{display:inline-block;width:18px;height:3px;border-radius:4px;background:currentColor}
+    .sales-legend .retail-key{color:#287a57}.sales-legend .reseller-key{color:#9a7655}
+    .sales-report-note{font-size:12px;color:var(--color-text-muted);margin-top:12px}
+    .sales-report-status{min-height:20px;margin-top:8px;font-size:13px;color:var(--color-text-muted)}
+    .sales-chart-empty{padding:34px 12px;text-align:center;color:var(--color-text-muted);border:1px dashed var(--color-border)}
+    @media(max-width:620px){.sales-kpis{grid-template-columns:1fr}.sales-kpi{padding:13px}.sales-report-head{display:block}.sales-report-tools{margin-top:16px}.sales-report-tools select,.sales-report-tools button{flex:1}.sales-chart text{font-size:10px}}
+  </style>
+</head><body class="admin-page"><a class="skip-link" href="#reseller-main">Skip to content</a><header class="admin-header"><div class="container header-inner"><a class="brand" href="../../index.html">MAHAYI HERBAL REMEDIES <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
 <main id="reseller-main" class="admin-main"><div class="container"><div class="settings-heading"><div><p class="eyebrow">Independent reseller business</p><h1>Reseller Programme</h1><p class="muted">Choose one area to manage at a time. Reseller records are separate from the normal retail shop catalogue and orders.</p></div><a class="button button-outline" href="../../admin/">Main admin</a></div>
-<div class="admin-sections">
+    <section class="sales-report" aria-labelledby="sales-report-title">
+      <div class="sales-report-head"><div><p class="eyebrow">Business performance</p><h2 id="sales-report-title">Sales over time</h2><p class="muted">Monthly sales from Mahayi stock orders to resellers and reseller sales to their customers.</p></div>
+        <div class="sales-report-tools"><label for="sales-period" class="muted">Period</label><select id="sales-period"><option value="3">Last 3 months</option><option value="6" selected>Last 6 months</option><option value="12">Last 12 months</option><option value="24">Last 24 months</option></select><button class="button button-outline" id="sales-refresh" type="button">Refresh</button></div>
+      </div>
+      <div class="sales-kpis" aria-live="polite">
+        <div class="sales-kpi"><span>Mahayi sales to resellers</span><strong id="company-revenue">—</strong></div>
+        <div class="sales-kpi"><span>Reseller sales to customers</span><strong id="reseller-revenue">—</strong></div>
+        <div class="sales-kpi"><span>Mahayi stock orders fulfilled</span><strong id="company-orders">—</strong></div>
+        <div class="sales-kpi"><span>Reseller stock cost recovered from customers</span><strong id="reseller-cost-recovered">—</strong></div>
+        <div class="sales-kpi"><span>Reseller expected gross profit</span><strong id="reseller-expected-profit">—</strong></div>
+        <div class="sales-kpi"><span>Reseller profit cash collected after stock cost</span><strong id="reseller-profit-collected">—</strong></div>
+      </div>
+      <div id="sales-chart-region" class="sales-chart-wrap"><div class="sales-chart-empty">Loading recorded sales…</div></div>
+      <div class="sales-legend"><span class="retail-key"><i></i>Mahayi sales to resellers</span><span class="reseller-key"><i></i>Reseller sales to customers</span></div>
+      <p class="sales-report-note">Mahayi sales count fulfilled reseller stock orders, whether or not the reseller has resold that stock. Reseller sales count their recorded customer sales. The reseller profit figures use sales recorded in the selected months and their current payment history: customer payments recover stock cost first, and only amounts collected above that cost count as profit cash collected. Expected gross profit is not net profit and excludes other business expenses. Cancelled sales are excluded.</p>
+      <p class="sales-report-status" id="sales-report-status" role="status" aria-live="polite"></p>
+    </section>
+\n<div class="admin-sections">
 <a class="admin-panel" href="../../admin/content/"><div class="panel-icon">07</div><div><h2>Information Pages</h2><p class="muted">Manage shared policies and information displayed on the main website and reseller portal.</p></div><span class="button button-outline">Manage information</span></a>
 <a class="admin-panel" href="products/"><div class="panel-icon">01</div><div><h2>Reseller Products</h2><p class="muted">Create, edit, archive and manage reseller-only product details and stock.</p></div><span class="button button-outline">Manage products</span></a>
 <a class="admin-panel" href="categories/"><div class="panel-icon">02</div><div><h2>Product Categories</h2><p class="muted">Create and organise categories used only by reseller products.</p></div><span class="button button-outline">Manage categories</span></a>
@@ -11,4 +50,61 @@
 <a class="admin-panel" href="sales/"><div class="panel-icon">05</div><div><h2>Customer Sales</h2><p class="muted">Review reseller-recorded customer sales, product quantities and reseller earnings.</p></div><span class="button button-outline">View sales</span></a>
 <a class="admin-panel" href="settlements/"><div class="panel-icon">06</div><div><h2>Distributor Settlements</h2><p class="muted">Track outstanding company-share balances and record repayments from approved distributors.</p></div><span class="button button-outline">Manage settlements</span></a>
 <section class="admin-panel"><div class="panel-icon">06</div><div><h2>Programme Settings</h2><p class="muted">Configure registration rules and programme-wide settings.</p><p class="muted"><strong>Not built yet.</strong> This area will be added separately.</p></div></section>
-</div></div></main><footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">MAHAYI HERBAL REMEDIES</a><p>© <span data-current-year>2026</span> MAHAYI HERBAL REMEDIES</p><a href="../../admin/">Main admin</a></div></footer></body></html>
+</div></div></main><footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../../index.html">MAHAYI HERBAL REMEDIES</a><p>© <span data-current-year>2026</span> MAHAYI HERBAL REMEDIES</p><a href="../../admin/">Main admin</a></div></footer>  <script type="module">
+    const $ = (selector) => document.querySelector(selector);
+    const period = $('#sales-period');
+    const status = $('#sales-report-status');
+    const region = $('#sales-chart-region');
+    const formatMoney = (value) => new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR',maximumFractionDigits:0}).format(Number(value)||0);
+    const monthLabel = (value) => { const [year,month]=value.split('-').map(Number); return new Date(year,month-1,1).toLocaleDateString('en-ZA',{month:'short',year:'2-digit'}); };
+    function drawChart(months, retailRows, resellerRows) {
+      const companyMap=new Map(retailRows.map(row=>[row.month,Number(row.revenue)||0]));
+      const resellerMap=new Map(resellerRows.map(row=>[row.month,Number(row.revenue)||0]));
+      const labels=[];
+      const now=new Date();
+      const count=Number(period.value)||6;
+      for(let offset=count-1;offset>=0;offset--){const d=new Date(now.getFullYear(),now.getMonth()-offset,1);labels.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));}
+      const company=labels.map(m=>companyMap.get(m)||0), reseller=labels.map(m=>resellerMap.get(m)||0);
+      const max=Math.max(1,...company,...reseller), w=760,h=280,left=54,right=14,top=18,bottom=42,plotW=w-left-right,plotH=h-top-bottom;
+      const x=i=>left+(labels.length===1?plotW/2:i*plotW/(labels.length-1));
+      const y=v=>top+plotH-(v/max)*plotH;
+      const points=values=>values.map((v,i)=>x(i)+','+y(v)).join(' ');
+      const grid=[0,.25,.5,.75,1].map(frac=>{const yy=top+plotH-frac*plotH;return '<line x1="'+left+'" y1="'+yy+'" x2="'+(w-right)+'" y2="'+yy+'" stroke="currentColor" opacity=".12"/><text x="'+(left-8)+'" y="'+(yy+4)+'" text-anchor="end">'+(max*frac>=1000?'R'+(max*frac/1000).toFixed(1)+'k':'R'+Math.round(max*frac))+'</text>';}).join('');
+      const xLabels=labels.map((m,i)=>'<text x="'+x(i)+'" y="'+(h-12)+'" text-anchor="middle">'+monthLabel(m)+'</text>').join('');
+      const retailDots=company.map((v,i)=>'<circle cx="'+x(i)+'" cy="'+y(v)+'" r="3.5" fill="#287a57"><title>'+monthLabel(labels[i])+': Mahayi sales to resellers '+formatMoney(v)+'</title></circle>').join('');
+      const resellerDots=reseller.map((v,i)=>'<circle cx="'+x(i)+'" cy="'+y(v)+'" r="3.5" fill="#9a7655"><title>'+monthLabel(labels[i])+': reseller sales to customers '+formatMoney(v)+'</title></circle>').join('');
+      region.innerHTML='<svg class="sales-chart" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="Monthly Mahayi sales to resellers and reseller sales to customers. Hover or tap a point for its value.">'+grid+'<polyline points="'+points(company)+'" fill="none" stroke="#287a57" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polyline points="'+points(reseller)+'" fill="none" stroke="#9a7655" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'+retailDots+resellerDots+xLabels+'</svg>';
+      if(!company.some(v=>v>0)&&!reseller.some(v=>v>0))status.textContent='No recorded sales for this period yet. The graph is showing zero values, not sample data.';
+    }
+    async function loadSales(){
+      status.textContent='Loading recorded sales…';region.innerHTML='<div class="sales-chart-empty">Loading recorded sales…</div>';
+      try{
+        if(typeof window.getAdminIdToken!=='function')throw Error('Admin sign-in is still loading. Refresh this page in a moment.');
+        const token=await window.getAdminIdToken();
+        const url=new URL('/api/admin-orders',location.origin);url.searchParams.set('report','monthly-sales');url.searchParams.set('months',period.value);
+        const response=await fetch(url,{headers:{Authorization:'Bearer '+token,Accept:'application/json'},cache:'no-store'});
+        const payload=await response.json().catch(()=>({}));
+        if(!response.ok||!payload.success)throw Error(payload.error||'Unable to load the sales report.');
+        const data=payload.data||{},company=data.company_sales||[],reseller=data.reseller_sales||[],profit=data.reseller_profit||[];
+        const companyRevenue=company.reduce((sum,row)=>sum+(Number(row.revenue)||0),0);
+        const companyOrders=company.reduce((sum,row)=>sum+(Number(row.order_count)||0),0);
+        const resellerRevenue=reseller.reduce((sum,row)=>sum+(Number(row.revenue)||0),0);
+        const stockCostRecovered=profit.reduce((sum,row)=>sum+(Number(row.stock_cost_recovered)||0),0);
+        const expectedProfit=profit.reduce((sum,row)=>sum+(Number(row.expected_profit)||0),0);
+        const profitCollected=profit.reduce((sum,row)=>sum+(Number(row.profit_collected)||0),0);
+        $('#company-revenue').textContent=formatMoney(companyRevenue);
+        $('#company-orders').textContent=String(companyOrders);
+        $('#reseller-revenue').textContent=formatMoney(resellerRevenue);
+        $('#reseller-cost-recovered').textContent=formatMoney(stockCostRecovered);
+        $('#reseller-expected-profit').textContent=formatMoney(expectedProfit);
+        $('#reseller-profit-collected').textContent=formatMoney(profitCollected);
+        $('#dashboard-order-count').textContent=String(companyOrders);
+        drawChart(Number(data.months)||Number(period.value),company,reseller);
+        if(status.textContent==='Loading recorded sales…')status.textContent='Updated from saved sales records.';
+      }catch(error){region.innerHTML='<div class="sales-chart-empty">Sales data could not be loaded.</div>';status.textContent=error.message||'Sales report unavailable.';$('#company-revenue').textContent='—';$('#company-orders').textContent='—';$('#reseller-revenue').textContent='—';$('#reseller-cost-recovered').textContent='—';$('#reseller-expected-profit').textContent='—';$('#reseller-profit-collected').textContent='—';$('#dashboard-order-count').textContent='—';}
+    }
+    period.addEventListener('change',loadSales);
+    $('#sales-refresh').addEventListener('click',loadSales);
+    loadSales();
+  </script>
+</body></html>
