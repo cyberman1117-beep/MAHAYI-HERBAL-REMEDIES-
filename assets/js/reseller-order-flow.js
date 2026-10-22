@@ -113,8 +113,28 @@ function renderCheckout(){
  $("#checkout-total").textContent="Total for all cart items: "+money(total);
  $("#checkout-order-type").textContent=items.length+" line item(s)"+(mixedUnits?" · "+mixedUnits+" individual units":"")+(packages.size?" · full packages included":"");
 }
+function profileIsComplete(profile) {
+ const residential = ["residential_street","residential_area","residential_city","residential_province","residential_postal_code"];
+ const delivery = ["delivery_street","delivery_area","delivery_city","delivery_province","delivery_postal_code"];
+ return Boolean(profile?.full_name?.trim() && profile?.phone?.trim() && residential.every(k=>String(profile?.[k]||"").trim()) && delivery.every(k=>String(profile?.[k]||"").trim()));
+}
+function renderDeliveryPreview() {
+ const box=$("#delivery-preview"), warning=$("#profile-required-message"), link=$("#complete-profile-link"), button=$("#confirm-stock-order");
+ if(!box)return;
+ const complete=profileIsComplete(reseller);
+ if(complete) {
+  box.textContent="Deliver to: "+[reseller.delivery_name || reseller.full_name, reseller.delivery_street, reseller.delivery_area, reseller.delivery_city, reseller.delivery_province, reseller.delivery_postal_code].filter(Boolean).join(", ")+(reseller.delivery_instructions?" · Instructions: "+reseller.delivery_instructions:"");
+  warning.hidden=true;link.hidden=true;
+ } else {
+  box.textContent="Your delivery address is not complete yet.";
+  warning.textContent="Complete and save your personal, residential and delivery details in My Account before placing a stock order.";
+  warning.hidden=false;link.hidden=false;
+ }
+ if(button)button.disabled=!complete || getCartLines().length===0;
+}
 async function submitOrder(){
  const items=getCartLines(),mixedUnits=items.filter(i=>i.item_type==="mixed").reduce((n,i)=>n+i.quantity,0);
+ if(!profileIsComplete(reseller)){ $("#checkout-status").textContent="Complete and save your delivery details in My Account before placing a stock order."; $("#profile-required-message").hidden=false;$("#complete-profile-link").hidden=false;return; }
  if(!items.length||(mixed.size>0&&mixedUnits<10)){ $("#checkout-status").textContent=!items.length?"Your cart is empty.":"Your individual-unit selections must total at least 10 units.";return; }
  const button=$("#confirm-stock-order");button.disabled=true;$("#checkout-status").textContent="Submitting your order…";
  try{
@@ -126,7 +146,7 @@ async function submitOrder(){
 }
 function initPage(){
  const path=location.pathname;
- if(path.includes("/checkout/")){renderCheckout();$("#confirm-stock-order").addEventListener("click",submitOrder);return;}
+ if(path.includes("/checkout/")){renderCheckout();renderDeliveryPreview();$("#confirm-stock-order").addEventListener("click",submitOrder);return;}
  const params=new URL(location.href).searchParams,requested=params.get("order_package");
  if(requested){const id=Number(requested),qty=Number(params.get("quantity")||1);const f=findPackage(id);if(f&&Number.isSafeInteger(qty)&&qty>=Number(f.pkg.minimum_order_quantity||1)&&qty<=Number(f.pkg.stock_quantity)){packages.set(id,(packages.get(id)||0)+qty);save(keys.packages,packages);$("#cart-status").textContent="Package added to your cart.";}else $("#cart-status").textContent="Could not add that package. Check stock and try again.";params.delete("order_package");params.delete("quantity");history.replaceState({},"",location.pathname);}
  const mixedProduct=params.get("mixed_product");if(mixedProduct){params.delete("mixed_product");history.replaceState({},"",location.pathname);openBuilder(mixedProduct);}
@@ -147,5 +167,6 @@ onAuthStateChanged(auth,async user=>{
  if($("#pay-later-option"))$("#pay-later-option").hidden=Number(reseller.pay_later_enabled)!==1;
  $("#order-page-status").textContent="Signed in as "+(reseller.full_name||user.email)+".";
  initPage();
+ if(location.pathname.includes("/checkout/"))renderDeliveryPreview();
  }catch(e){$("#order-page-status").textContent=e.message;$("#order-page-signin").hidden=false;}
 });
