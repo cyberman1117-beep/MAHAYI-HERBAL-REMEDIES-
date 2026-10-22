@@ -190,8 +190,8 @@ export async function handleAdminResellerManagement(request, env) {
     if (resource === "sales" && request.method === "GET") {
       const sales = await env.DB.prepare(`
         SELECT o.id, o.order_number, o.reseller_id, r.full_name AS reseller_name, r.email AS reseller_email,
-               o.customer_full_name, o.customer_phone, o.currency, o.subtotal, o.reseller_earnings,
-               o.company_earnings, o.payment_status, o.order_status, o.created_at,
+               o.currency, o.subtotal, o.reseller_earnings,
+               o.company_earnings, o.payment_status, o.order_status, o.sale_date, o.created_at,
                COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) AS amount_collected
         FROM reseller_orders o JOIN resellers r ON r.id = o.reseller_id
         ORDER BY o.created_at DESC, o.id DESC LIMIT 500
