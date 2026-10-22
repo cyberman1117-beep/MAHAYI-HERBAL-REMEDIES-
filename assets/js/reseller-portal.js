@@ -309,18 +309,35 @@ async function loadInventoryAndOrders() {
     const inv = await api("inventory");
     const list = $("#inventory-list"); list.replaceChildren();
     const items = inv.data?.inventory || [];
-    $("#inventory-status").textContent = items.length ? items.length + " inventory product(s)." : "No stock has been released to your inventory yet.";
-    for (const item of items) list.append(makeCard(item.name + (item.package_label ? " — " + item.package_label : ""), ["Available units: " + item.quantity_available, "SKU: " + (item.sku || "—"), "Last updated: " + item.updated_at]));
+    const search = ($("#inventory-search")?.value || "").trim().toLowerCase();
+    const statusFilter = $("#inventory-filter")?.value || "all";
+    const filtered = items.filter(item => {
+      const matchesText = [item.name, item.package_label, item.sku].some(value => String(value || "").toLowerCase().includes(search));
+      const available = Number(item.quantity_available || 0);
+      return matchesText && (statusFilter === "all" || (statusFilter === "available" ? available > 0 : available <= 0));
+    });
+    $("#inventory-status").textContent = filtered.length ? filtered.length + " inventory line(s) shown. Quantities update when stock is sold." : (items.length ? "No inventory matches these filters." : "No stock has been released to your inventory yet.");
+    for (const item of filtered) list.append(makeCard(item.name + (item.package_label ? " — " + item.package_label : ""), ["Available units: " + Number(item.quantity_available || 0), "Sold units recorded: " + Number(item.sold_quantity || 0), "Pay-later units: " + Number(item.pay_later_quantity || 0), "SKU: " + (item.sku || "—"), "Last updated: " + item.updated_at]));
   } catch (e) { $("#inventory-status").textContent = e.message; }
   try {
     const result = await api("stock-orders");
     const orders = result.data?.orders || [];
     const items = result.data?.items || [];
     const list = $("#orders-list"); list.replaceChildren();
-    $("#orders-status").textContent = orders.length ? orders.length + " stock order(s)." : "You have not placed a stock order yet.";
-    for (const order of orders) {
+    const searchOrders = ($("#orders-search")?.value || "").trim().toLowerCase();
+    const orderStatusFilter = $("#orders-filter")?.value || "all";
+    const paymentFilter = $("#orders-payment-filter")?.value || "all";
+    const filteredOrders = orders.filter(order => {
       const lines = items.filter(item => Number(item.reseller_stock_order_id) === Number(order.id));
-      const card = makeCard(order.order_number, ["Total: " + money(order.total_amount, order.currency), "Payment: " + order.payment_status, "Arrangement: " + (order.fulfilment_mode === "pay_later" ? "Approved pay-later stock" : "Upfront stock purchase"), "Stock order: " + order.order_status, "Submitted: " + order.created_at, ...lines.map(item => item.product_name + " × " + item.quantity), order.payment_reference ? "Payment reference: " + order.payment_reference : "Payment reference: not recorded"]);
+      const searchable = [order.order_number, ...lines.flatMap(item => [item.product_name, item.package_label, item.product_sku])].join(" ").toLowerCase();
+      return searchable.includes(searchOrders)
+        && (orderStatusFilter === "all" || String(order.order_status || "").toLowerCase() === orderStatusFilter)
+        && (paymentFilter === "all" || String(order.payment_status || "").toLowerCase() === paymentFilter);
+    });
+    $("#orders-status").textContent = filteredOrders.length ? filteredOrders.length + " stock order(s) shown." : (orders.length ? "No stock orders match these filters." : "You have not placed a stock order yet.");
+    for (const order of filteredOrders) {
+      const lines = items.filter(item => Number(item.reseller_stock_order_id) === Number(order.id));
+      const card = makeCard(order.order_number, ["Total: " + money(order.total_amount, order.currency), "Payment: " + order.payment_status, "Arrangement: " + (order.fulfilment_mode === "pay_later" ? "Approved pay-later stock" : "Upfront stock purchase"), "Stock order: " + order.order_status, "Submitted: " + order.created_at, ...lines.map(item => item.product_name + " — " + item.package_label + " × " + item.quantity), order.payment_reference ? "Payment reference: " + order.payment_reference : "Payment reference: not recorded"]);
       list.append(card);
     }
   } catch (e) { $("#orders-status").textContent = e.message; }
@@ -441,6 +458,11 @@ $("#record-sale").addEventListener("click", async () => {
 $("#refresh-stock-register").addEventListener("click", loadStockRegister);
 $("#refresh-inventory").addEventListener("click", loadInventoryAndOrders);
 $("#refresh-orders").addEventListener("click", loadInventoryAndOrders);
+["inventory-search", "inventory-filter", "orders-search", "orders-filter", "orders-payment-filter"].forEach(id => {
+  const control = $("#" + id);
+  if (!control) return;
+  control.addEventListener(control.tagName === "INPUT" ? "input" : "change", () => loadInventoryAndOrders());
+});
 function openMixedBuilder(productId) {
   const cartUrl = new URL("cart/", location.href);
   if (productId != null) cartUrl.searchParams.set("mixed_product", String(productId));
