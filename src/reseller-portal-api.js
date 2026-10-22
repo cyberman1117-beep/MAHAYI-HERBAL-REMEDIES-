@@ -295,7 +295,11 @@ export async function handleResellerPortal(request, env) {
         const orders = await env.DB.prepare(`
           SELECT o.id, o.order_number, o.currency, o.subtotal,
                  o.reseller_earnings, o.company_earnings, o.payment_status, o.order_status, o.sale_date, o.expected_payment_date, o.customer_notes, o.created_at,
-                 COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) AS amount_collected
+                 COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) AS amount_collected,
+                 MIN(o.company_earnings, COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0)) AS stock_cost_recovered,
+                 MAX(0, COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) - o.company_earnings) AS profit_collected,
+                 MAX(0, o.company_earnings - COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0)) AS stock_cost_unrecovered,
+                 MAX(0, o.reseller_earnings - MAX(0, COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) - o.company_earnings)) AS profit_not_yet_collected
           FROM reseller_orders o WHERE o.reseller_id = ? ORDER BY o.created_at DESC, o.id DESC LIMIT 100
         `).bind(reseller.id).all();
         const payments = await env.DB.prepare(`
