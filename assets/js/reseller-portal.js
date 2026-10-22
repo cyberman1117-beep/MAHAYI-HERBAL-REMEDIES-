@@ -98,6 +98,9 @@ function makeCard(titleText, lines = []) {
   card.append(marker, details);
   return card;
 }
+function individualSizeLabel(label) {
+  return String(label || "Item").replace(/\s*(?:x|×|by)\s*\d+\s*$/i, "").trim() || "Item";
+}
 function findPackage(packageId) {
   for (const product of products) {
     const pkg = (product.packages || []).find((item) => Number(item.package_id || item.id) === Number(packageId));
@@ -147,12 +150,12 @@ function renderProducts(data) {
     details.append(priceLine);
     const table = document.createElement("table"); table.className = "data-table";
     const thead = document.createElement("thead"), tr = document.createElement("tr");
-    for (const label of ["Stock package", "Units/package", "Cost per unit", "Selling price/unit", "Profit/unit", "Package cost", "Packages available", "Order packages", "Choose"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; tr.append(th); }
+    for (const label of ["Individual item size", "Items inside each stock package", "Cost per item", "Customer price per item", "Profit per item", "Total stock package cost", "Stock packages available", "Order packages", "Choose"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; tr.append(th); }
     thead.append(tr); table.append(thead);
     const tbody = document.createElement("tbody");
     for (const pkg of (product.packages || []).filter((item) => Number(item.is_enabled) === 1)) {
       const row = document.createElement("tr");
-      const label = document.createElement("td"); label.textContent = pkg.package_label || "Package";
+      const label = document.createElement("td"); label.textContent = individualSizeLabel(pkg.package_label);
       const units = Number(pkg.units_per_package || 1);
       const unitsCell = document.createElement("td"); unitsCell.textContent = String(units);
       const stockAmount = document.createElement("td"); stockAmount.textContent = money(pkg.stock_unit_price, product.currency);
@@ -248,7 +251,7 @@ async function loadStockRegister() {
     for (const unit of units) {
       const card = document.createElement("article"); card.className = "admin-panel";
       const head = document.createElement("div");
-      const title = document.createElement("h3"); title.textContent = unit.product_name + " — " + unit.package_label;
+      const title = document.createElement("h3"); title.textContent = unit.product_name + " — " + individualSizeLabel(unit.package_label) + " · Item " + unit.unit_number;
       const code = document.createElement("p"); code.className = "muted"; code.textContent = "Tracking code: " + unit.tracking_code + (unit.product_sku ? " · Product SKU: " + unit.product_sku : "");
       const price = document.createElement("p"); price.textContent = "Expected selling price: " + money(unit.customer_price, unit.currency) + " · Stock order: " + unit.stock_order_number;
       const state = document.createElement("p"); state.textContent = "Status: " + (unit.status === "available" ? "Available to sell" : unit.status === "sold" ? "Sold" : unit.status) + (unit.sale_order_number ? " · Sale " + unit.sale_order_number + (unit.sale_date ? " · " + unit.sale_date : "") : "");
