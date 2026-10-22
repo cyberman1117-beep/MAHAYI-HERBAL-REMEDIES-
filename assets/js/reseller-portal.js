@@ -253,6 +253,46 @@ function renderSaleCart() {
   $("#record-sale").disabled = !chosen.length;
   return chosen;
 }
+function updateSelectedStockTotal() {
+  let total = 0;
+  for (const unit of selectedStockUnits.values()) total += Number(unit.customer_price || 0);
+  $("#sale-cart-total").textContent = "Selected items total: " + money(total);
+  $("#record-sale").disabled = selectedStockUnits.size === 0;
+}
+async function loadStockRegister() {
+  try {
+    const result = await api("stock-register");
+    const units = result.data?.units || [];
+    const list = $("#stock-register-list"); list.replaceChildren();
+    $("#stock-register-status").textContent = units.length ? units.length + " individually tracked item(s) in your register." : "No stock has been released to your register yet. Items appear here when Mahayi confirms payment and releases your stock order.";
+    const statusRank = { available: 0, sold: 1, returned: 2, adjusted: 3 };
+    units.sort((a,b) => (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9) || String(b.created_at).localeCompare(String(a.created_at)));
+    for (const unit of units) {
+      const card = document.createElement("article"); card.className = "admin-panel";
+      const head = document.createElement("div");
+      const title = document.createElement("h3"); title.textContent = unit.product_name + " — " + unit.package_label;
+      const code = document.createElement("p"); code.className = "muted"; code.textContent = "Tracking code: " + unit.tracking_code + (unit.product_sku ? " · Product SKU: " + unit.product_sku : "");
+      const price = document.createElement("p"); price.textContent = "Expected selling price: " + money(unit.customer_price, unit.currency) + " · Stock order: " + unit.stock_order_number;
+      const state = document.createElement("p"); state.textContent = "Status: " + (unit.status === "available" ? "Available to sell" : unit.status === "sold" ? "Sold" : unit.status);
+      head.append(title, code, price, state);
+      if (unit.status === "available") {
+        const label = document.createElement("label"); label.className = "field"; label.style.display = "flex"; label.style.alignItems = "center"; label.style.gap = ".5rem";
+        const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = selectedStockUnits.has(Number(unit.unit_id));
+        const textNode = document.createElement("span"); textNode.textContent = "I sold this item";
+        checkbox.addEventListener("change", () => {
+          const id = Number(unit.unit_id);
+          if (checkbox.checked) selectedStockUnits.set(id, unit); else selectedStockUnits.delete(id);
+          updateSelectedStockTotal();
+        });
+        label.append(checkbox, textNode); head.append(label);
+      } else if (unit.reseller_note) {
+        const note = document.createElement("p"); note.className = "muted"; note.textContent = "Note: " + unit.reseller_note; head.append(note);
+      }
+      card.append(head); list.append(card);
+    }
+    updateSelectedStockTotal();
+  } catch (error) { $("#stock-register-status").textContent = "Could not load the stock register: " + error.message; }
+}
 async function loadSales() {
   try {
     const result = await api("sales");
@@ -366,6 +406,7 @@ async function loadAccount() {
     $("#products-status").textContent = "Your account is signed in, but the catalogue could not load: " + error.message;
   }
   await loadInventoryAndOrders();
+  await loadStockRegister();
   await loadSales();
   await loadLedger();
 }
@@ -403,16 +444,20 @@ document.querySelectorAll("[data-refresh]").forEach((button) => button.addEventL
 $("#refresh-sales").addEventListener("click", loadSales);
 $("#refresh-ledger").addEventListener("click", loadLedger);
 $("#record-sale").addEventListener("click", async () => {
-  const items = renderSaleCart(); if (!items.length) return;
-  const button = $("#record-sale"); button.disabled = true; $("#sale-cart-status").textContent = "Recording customer sale…";
+  const unitIds = [...selectedStockUnits.keys()];
+  if (!unitIds.length) return;
+  const saleDate = $("#sale-date").value || new Date().toISOString().slice(0, 10);
+  const button = $("#record-sale"); button.disabled = true; $("#sale-cart-status").textContent = "Recording selected stock as sold…";
   try {
-    const result = await api("sales", "POST", { items, sale_date: $("#sale-date").value, amount_collected: $("#sale-amount-collected").value, payment_date: $("#sale-payment-date").value, payment_method: $("#sale-payment-method").value, payment_reference: $("#sale-payment-reference").value });
-    saleCart.clear(); $("#sale-date").value = new Date().toISOString().slice(0, 10); $("#sale-amount-collected").value = "0"; $("#sale-payment-date").value = new Date().toISOString().slice(0, 10); $("#sale-payment-method").value = ""; $("#sale-payment-reference").value = ""; $("#sale-note").value = ""; renderSaleCart();
-    $("#sale-cart-status").textContent = "Sale " + result.data.order_number + " recorded for " + ($("#sale-date").value || "the selected date") + ". Your share: " + money(result.data.reseller_earnings, result.data.currency) + ". Collected: " + money(result.data.amount_collected, result.data.currency) + ". Customer balance: " + money(result.data.customer_balance, result.data.currency) + ".";
-    await loadAccount();
+    const result = await api("sales", "POST", { unit_ids: unitIds, items: [], sale_date: saleDate, amount_collected: $("#sale-amount-collected").value, payment_date: $("#sale-payment-date").value || saleDate, payment_method: $("#sale-payment-method").value, customer_notes: $("#sale-note").value, expected_payment_date: $("#sale-expected-date").value });
+    selectedStockUnits.clear();
+    $("#sale-amount-collected").value = "0"; $("#sale-payment-method").value = ""; $("#sale-note").value = ""; $("#sale-expected-date").value = "";
+    $("#sale-cart-status").textContent = "Sale " + result.data.order_number + " recorded. Total: " + money(result.data.subtotal, result.data.currency) + "; received: " + money(result.data.amount_collected, result.data.currency) + "; outstanding: " + money(result.data.customer_balance, result.data.currency) + ".";
+    await loadStockRegister(); await loadSales(); await loadInventoryAndOrders(); await loadLedger();
   } catch (error) { $("#sale-cart-status").textContent = error.message; }
-  finally { button.disabled = saleCart.size === 0; }
+  finally { updateSelectedStockTotal(); }
 });
+$("#refresh-stock-register").addEventListener("click", loadStockRegister);
 $("#refresh-inventory").addEventListener("click", loadInventoryAndOrders);
 $("#refresh-orders").addEventListener("click", loadInventoryAndOrders);
 function openMixedBuilder(productId) {
