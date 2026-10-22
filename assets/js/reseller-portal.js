@@ -24,6 +24,22 @@ const saleCart = new Map();
 let checkoutType = "packages";
 
 function showPanel(selector) { panels.forEach((panel) => { $(panel).hidden = panel !== selector; }); }
+function setWorkspaceView(view) {
+  const valid = ["overview", "catalogue", "sales", "stock", "settlements", "account"];
+  if (!valid.includes(view)) view = "overview";
+  $("#reseller-overview").hidden = view !== "overview";
+  document.querySelectorAll("[data-workspace-panel]").forEach((panel) => { panel.hidden = panel.dataset.workspacePanel !== view; });
+  document.querySelectorAll("[data-reseller-view]").forEach((button) => {
+    const active = button.dataset.resellerView === view;
+    button.classList.toggle("button-primary", active);
+    button.classList.toggle("button-outline", !active);
+    if (active) button.setAttribute("aria-current", "page"); else button.removeAttribute("aria-current");
+  });
+  const heading = document.querySelector('[data-reseller-view="' + view + '"]');
+  if (heading) heading.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+document.querySelectorAll("[data-reseller-view]").forEach((button) => button.addEventListener("click", () => setWorkspaceView(button.dataset.resellerView)));
+
 $("#sale-payment-date").value = new Date().toISOString().slice(0, 10);
 function setMode(nextMode) {
   mode = nextMode;
