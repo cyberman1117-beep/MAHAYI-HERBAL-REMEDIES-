@@ -104,7 +104,7 @@ async function stockOrders(request, env, id) {
   }
   const statements = [];
   if (orderStatus === "fulfilled" && !existing.inventory_applied_at) {
-    const items = await env.DB.prepare("SELECT reseller_product_id, package_id, package_label, product_name, quantity, units_per_package FROM reseller_stock_order_items WHERE reseller_stock_order_id = ?").bind(id).all();
+    const items = await env.DB.prepare("SELECT id, reseller_product_id, package_id, package_label, product_name, product_sku, quantity, units_per_package FROM reseller_stock_order_items WHERE reseller_stock_order_id = ?").bind(id).all();
     if (!items.results?.length) return json({ success: false, error: "Cannot fulfil an empty stock order." }, 409);
     for (const item of items.results) {
       if (!item.reseller_product_id || !item.package_id) return json({ success: false, error: "A package in this order is no longer available. Inventory was not changed." }, 409);
@@ -124,6 +124,16 @@ async function stockOrders(request, env, id) {
           (reseller_id, reseller_product_id, package_id, movement_type, quantity_change, reference_type, reference_id, notes)
         VALUES (?, ?, ?, ?, ?, 'stock_order', ?, ?)
       `).bind(existing.reseller_id, item.reseller_product_id, item.package_id, movementType, unitQuantity, id, "Stock order " + existing.order_number + " — " + item.product_name + " (" + item.package_label + ")"));
+      for (let unitNumber = 1; unitNumber <= unitQuantity; unitNumber++) {
+        const sku = String(item.product_sku || "").trim();
+        const trackingCode = "MHR-R" + existing.reseller_id + "-O" + id + "-I" + item.id + "-U" + unitNumber;
+        statements.push(env.DB.prepare(`
+          INSERT INTO reseller_stock_units
+            (reseller_id, stock_order_id, stock_order_item_id, package_id, unit_number, product_sku, tracking_code)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(stock_order_item_id, unit_number) DO NOTHING
+        `).bind(existing.reseller_id, id, item.id, item.package_id, unitNumber, sku, trackingCode));
+      }
     }
     statements.push(env.DB.prepare(`
       UPDATE reseller_stock_orders SET payment_status = ?, order_status = ?, payment_reference = ?,
