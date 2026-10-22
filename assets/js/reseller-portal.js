@@ -251,7 +251,7 @@ async function loadStockRegister() {
       const title = document.createElement("h3"); title.textContent = unit.product_name + " — " + unit.package_label;
       const code = document.createElement("p"); code.className = "muted"; code.textContent = "Tracking code: " + unit.tracking_code + (unit.product_sku ? " · Product SKU: " + unit.product_sku : "");
       const price = document.createElement("p"); price.textContent = "Expected selling price: " + money(unit.customer_price, unit.currency) + " · Stock order: " + unit.stock_order_number;
-      const state = document.createElement("p"); state.textContent = "Status: " + (unit.status === "available" ? "Available to sell" : unit.status === "sold" ? "Sold" : unit.status);
+      const state = document.createElement("p"); state.textContent = "Status: " + (unit.status === "available" ? "Available to sell" : unit.status === "sold" ? "Sold" : unit.status) + (unit.sale_order_number ? " · Sale " + unit.sale_order_number + (unit.sale_date ? " · " + unit.sale_date : "") : "");
       head.append(title, code, price, state);
       if (unit.status === "available") {
         const label = document.createElement("label"); label.className = "field"; label.style.display = "flex"; label.style.alignItems = "center"; label.style.gap = ".5rem";
