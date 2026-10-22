@@ -220,7 +220,11 @@ export async function handleAdminResellerManagement(request, env) {
         SELECT o.id, o.order_number, o.reseller_id, r.full_name AS reseller_name, r.email AS reseller_email,
                o.currency, o.subtotal, o.reseller_earnings,
                o.company_earnings, o.payment_status, o.order_status, o.sale_date, o.created_at,
-               COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) AS amount_collected
+               COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) AS amount_collected,
+               MIN(o.company_earnings, COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0)) AS stock_cost_recovered,
+               MAX(0, COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) - o.company_earnings) AS profit_collected,
+               MAX(0, o.company_earnings - COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0)) AS stock_cost_unrecovered,
+               MAX(0, o.reseller_earnings - MAX(0, COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) - o.company_earnings)) AS profit_not_yet_collected
         FROM reseller_orders o JOIN resellers r ON r.id = o.reseller_id
         ORDER BY o.created_at DESC, o.id DESC LIMIT 500
       `).all();
@@ -239,6 +243,11 @@ export async function handleAdminResellerManagement(request, env) {
                COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p JOIN reseller_orders o ON o.id = p.reseller_order_id WHERE o.reseller_id = r.id AND o.order_status <> 'cancelled'), 0) AS amount_collected,
                COALESCE((SELECT SUM(o.subtotal) FROM reseller_orders o WHERE o.reseller_id = r.id AND o.order_status <> 'cancelled'), 0)
                  - COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p JOIN reseller_orders o ON o.id = p.reseller_order_id WHERE o.reseller_id = r.id AND o.order_status <> 'cancelled'), 0) AS customer_outstanding,
+               COALESCE((SELECT SUM(o.company_earnings) FROM reseller_orders o WHERE o.reseller_id = r.id AND o.order_status <> 'cancelled'), 0) AS stock_cost,
+               COALESCE((SELECT SUM(o.reseller_earnings) FROM reseller_orders o WHERE o.reseller_id = r.id AND o.order_status <> 'cancelled'), 0) AS expected_profit,
+               COALESCE((SELECT SUM(MIN(o.company_earnings, COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0))) FROM reseller_orders o WHERE o.reseller_id = r.id AND o.order_status <> 'cancelled'), 0) AS stock_cost_recovered,
+               COALESCE((SELECT SUM(MAX(0, COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) - o.company_earnings)) FROM reseller_orders o WHERE o.reseller_id = r.id AND o.order_status <> 'cancelled'), 0) AS profit_collected,
+               COALESCE((SELECT SUM(MAX(0, o.reseller_earnings - MAX(0, COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) - o.company_earnings))) FROM reseller_orders o WHERE o.reseller_id = r.id AND o.order_status <> 'cancelled'), 0) AS profit_not_yet_collected,
                COALESCE((SELECT SUM(i.quantity) FROM reseller_order_items i JOIN reseller_orders o ON o.id = i.reseller_order_id WHERE o.reseller_id = r.id AND o.order_status <> 'cancelled'), 0) AS units_sold,
                COALESCE((SELECT SUM(inv.quantity_available) FROM reseller_package_inventory inv WHERE inv.reseller_id = r.id), 0) AS units_in_stock
         FROM resellers r WHERE r.status = 'active' ORDER BY sales_value DESC, r.full_name
