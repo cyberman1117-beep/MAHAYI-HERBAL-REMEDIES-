@@ -162,17 +162,22 @@ function renderProducts(data) {
         localStorage.setItem("mhr_reseller_package_cart", JSON.stringify(saved));
         if(status)status.textContent = quantity + " full package(s) added to your cart. You can keep browsing or open your cart when ready.";
       });
-      const addSale = document.createElement("button"); addSale.className = "button button-outline"; addSale.type = "button"; addSale.textContent = "Record sale"; addSale.style.marginTop = ".35rem";
-      if (Number(pkg.reseller_stock_quantity || 0) < 1) { addSale.disabled = true; addSale.textContent = "No stock"; }
+      const saleQtyLabel = document.createElement("label"); saleQtyLabel.className = "field"; saleQtyLabel.style.display = "block"; saleQtyLabel.style.marginTop = ".5rem";
+      const saleQtyText = document.createElement("span"); saleQtyText.textContent = "Individual units to sell";
+      const saleQty = document.createElement("input"); saleQty.type = "number"; saleQty.min = "1"; saleQty.step = "1"; saleQty.value = "1"; saleQty.style.width = "5.5rem"; saleQty.setAttribute("aria-label", "Individual units to sell for " + product.name + " " + pkg.package_label);
+      saleQty.max = String(pkg.reseller_stock_quantity || 0);
+      saleQtyLabel.append(saleQtyText, saleQty);
+      const addSale = document.createElement("button"); addSale.className = "button button-outline"; addSale.type = "button"; addSale.textContent = "Add units to sale"; addSale.style.marginTop = ".35rem";
+      if (Number(pkg.reseller_stock_quantity || 0) < 1) { addSale.disabled = true; addSale.textContent = "No stock"; saleQty.disabled = true; }
       addSale.addEventListener("click", () => {
-        const quantity = Number(qty.value), id = Number(pkg.package_id);
-        if (!Number.isSafeInteger(quantity) || quantity < 1) { $("#sale-cart-status").textContent = "Enter a whole-number quantity for the customer sale."; return; }
-        if (quantity + (saleCart.get(id) || 0) > Number(pkg.reseller_stock_quantity || 0)) { $("#sale-cart-status").textContent = "Your inventory does not have enough " + product.name + " (" + pkg.package_label + ") for this sale."; return; }
+        const quantity = Number(saleQty.value), id = Number(pkg.package_id);
+        if (!Number.isSafeInteger(quantity) || quantity < 1) { $("#sale-cart-status").textContent = "Enter a whole-number quantity of individual units to sell."; return; }
+        if (quantity + (saleCart.get(id) || 0) > Number(pkg.reseller_stock_quantity || 0)) { $("#sale-cart-status").textContent = "Your inventory does not have enough individual units of " + product.name + " (" + pkg.package_label + ") for this sale."; return; }
         saleCart.set(id, (saleCart.get(id) || 0) + quantity); renderSaleCart();
-        $("#sale-cart-status").textContent = product.name + " (" + pkg.package_label + ") added to the customer sale.";
+        $("#sale-cart-status").textContent = quantity + " individual unit(s) of " + product.name + " (" + pkg.package_label + ") added to the customer sale.";
       });
       const chooseMixed = document.createElement("button"); chooseMixed.className = "button button-outline"; chooseMixed.type = "button"; chooseMixed.textContent = "Choose individual units"; chooseMixed.style.marginTop = ".35rem"; chooseMixed.addEventListener("click", () => openMixedBuilder(product.id));
-      actions.append(add, document.createTextNode(" "), addSale, document.createElement("br"), chooseMixed);
+      actions.append(add, document.createTextNode(" "), saleQtyLabel, addSale, document.createElement("br"), chooseMixed);
       row.append(label, unitsCell, stockAmount, resale, commission, packageCost, stock, qtyCell, actions); tbody.append(row);
     }
     table.append(tbody);
