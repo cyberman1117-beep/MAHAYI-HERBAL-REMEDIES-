@@ -245,9 +245,8 @@ async function loadStockRegister() {
     const result = await api("stock-register");
     const units = result.data?.units || [];
     const list = $("#stock-register-list"); list.replaceChildren();
-    $("#stock-register-status").textContent = units.length ? units.length + " individually tracked item(s) in your register." : "No stock has been released to your register yet. Items appear here when Mahayi confirms payment and releases your stock order.";
-    const statusRank = { available: 0, sold: 1, returned: 2, adjusted: 3 };
-    units.sort((a,b) => (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9) || String(b.created_at).localeCompare(String(a.created_at)));
+    $("#stock-register-status").textContent = units.length ? units.length + " individual item(s) available to sell. Sold items move to My Sales and are no longer shown here." : "No unsold items are available right now. Newly released stock appears here as individual items; sold items are recorded under My Sales.";
+    units.sort((a,b) => String(a.product_name).localeCompare(String(b.product_name)) || String(a.stock_order_number).localeCompare(String(b.stock_order_number)) || Number(a.unit_number) - Number(b.unit_number));
     for (const unit of units) {
       const card = document.createElement("article"); card.className = "admin-panel";
       const head = document.createElement("div");
