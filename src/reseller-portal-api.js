@@ -127,7 +127,10 @@ export async function handleResellerPortal(request, env) {
       if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
       const result = await env.DB.prepare(`
         SELECT ri.package_id, pkg.reseller_product_id AS product_id, p.name, pkg.package_label, p.sku, p.currency,
-               ri.quantity_available, ri.pay_later_quantity, ri.updated_at
+               ri.quantity_available, ri.pay_later_quantity, ri.updated_at,
+               COALESCE((SELECT SUM(CASE WHEN im.quantity_change < 0 THEN -im.quantity_change ELSE 0 END)
+                 FROM reseller_inventory_movements im
+                 WHERE im.reseller_id = ri.reseller_id AND im.package_id = ri.package_id AND im.movement_type = 'sale'), 0) AS sold_quantity
         FROM reseller_package_inventory ri
         JOIN reseller_product_packages pkg ON pkg.id = ri.package_id
         JOIN reseller_products p ON p.id = pkg.reseller_product_id
