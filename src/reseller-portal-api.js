@@ -103,6 +103,24 @@ export async function handleResellerPortal(request, env) {
       const products = (result.results || []).map((p) => ({ ...p, packages: byProduct.get(p.id) || [] }));
       return json({ success: true, data: { products } });
     }
+    if (action === "stock-register") {
+      const reseller = await getReseller(token, env);
+      if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
+      const result = await env.DB.prepare(`
+        SELECT u.id AS unit_id, u.tracking_code, u.product_sku, u.status, u.reseller_note, u.expected_payment_date,
+               u.reseller_order_id, u.created_at, p.name AS product_name, p.currency, pkg.package_label,
+               pkg.resale_amount AS customer_price, pkg.stock_amount AS stock_price, pkg.commission AS reseller_share,
+               so.order_number AS stock_order_number, so.created_at AS stock_order_date
+        FROM reseller_stock_units u
+        JOIN reseller_product_packages pkg ON pkg.id = u.package_id
+        JOIN reseller_products p ON p.id = pkg.reseller_product_id
+        JOIN reseller_stock_orders so ON so.id = u.stock_order_id
+        WHERE u.reseller_id = ?
+        ORDER BY u.created_at DESC, u.id DESC LIMIT 2000
+      `).bind(reseller.id).all();
+      return json({ success: true, data: { units: result.results || [] } });
+    }
+
     if (action === "inventory") {
       const reseller = await getReseller(token, env);
       if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
@@ -235,11 +253,29 @@ export async function handleResellerPortal(request, env) {
       const body = await request.json();
       if (!Array.isArray(body.items) || !body.items.length || body.items.length > 50) return json({ success: false, error: "Choose at least one package for this sale." }, 400);
       const quantities = new Map();
-      for (const item of body.items) {
-        const packageId = Number(item.package_id), quantity = Number(item.quantity);
-        if (!Number.isSafeInteger(packageId) || packageId <= 0 || !Number.isSafeInteger(quantity) || quantity <= 0) return json({ success: false, error: "Each sale row needs a package and whole-number quantity." }, 400);
-        quantities.set(packageId, (quantities.get(packageId) || 0) + quantity);
+      const unitIdsByPackage = new Map();
+      if (Array.isArray(body.unit_ids) && body.unit_ids.length) {
+        const ids = [...new Set(body.unit_ids.map(Number))];
+        if (ids.length !== body.unit_ids.length || ids.some(id => !Number.isSafeInteger(id) || id <= 0)) return json({ success: false, error: "Select valid individual stock records." }, 400);
+        const placeholders = ids.map(() => "?").join(",");
+        const selected = await env.DB.prepare(`
+          SELECT id, package_id, status FROM reseller_stock_units
+          WHERE reseller_id = ? AND id IN (${placeholders})
+        `).bind(reseller.id, ...ids).all();
+        if ((selected.results || []).length !== ids.length || selected.results.some(unit => unit.status !== "available")) return json({ success: false, error: "One or more selected stock records are no longer available." }, 409);
+        for (const unit of selected.results) {
+          quantities.set(Number(unit.package_id), (quantities.get(Number(unit.package_id)) || 0) + 1);
+          if (!unitIdsByPackage.has(Number(unit.package_id))) unitIdsByPackage.set(Number(unit.package_id), []);
+          unitIdsByPackage.get(Number(unit.package_id)).push(Number(unit.id));
+        }
+      } else {
+        for (const item of body.items) {
+          const packageId = Number(item.package_id), quantity = Number(item.quantity);
+          if (!Number.isSafeInteger(packageId) || packageId <= 0 || !Number.isSafeInteger(quantity) || quantity <= 0) return json({ success: false, error: "Each sale row needs a package and whole-number quantity." }, 400);
+          quantities.set(packageId, (quantities.get(packageId) || 0) + quantity);
+        }
       }
+      if (!quantities.size) return json({ success: false, error: "Select stock items to record this sale." }, 400);
       const saleItems = [];
       let subtotal = 0, resellerEarnings = 0, companyEarnings = 0, currency = "ZAR";
       for (const [packageId, quantity] of quantities) {
@@ -262,7 +298,7 @@ export async function handleResellerPortal(request, env) {
         subtotal = Math.round((subtotal + lineTotal) * 100) / 100;
         resellerEarnings = Math.round((resellerEarnings + resellerLine) * 100) / 100;
         companyEarnings = Math.round((companyEarnings + companyLine) * 100) / 100;
-        saleItems.push({ pkg, packageId, productId: Number(pkg.product_id), quantity, creditQuantity, lineTotal, resellerLine, companyLine });
+        saleItems.push({ pkg, packageId, productId: Number(pkg.product_id), quantity, creditQuantity, lineTotal, resellerLine, companyLine, unitIds: unitIdsByPackage.get(packageId) || [] });
       }
       const initialPayment = Math.round(Number(body.amount_collected || 0) * 100) / 100;
       if (!Number.isFinite(initialPayment) || initialPayment < 0 || initialPayment > subtotal + 0.001) return json({ success: false, error: "Enter a valid customer payment amount no greater than the sale total." }, 400);
@@ -297,6 +333,15 @@ export async function handleResellerPortal(request, env) {
               (reseller_id, reseller_product_id, package_id, movement_type, quantity_change, reference_type, reference_id, notes)
             VALUES (?, ?, ?, 'sale', ?, 'reseller_sale', ?, ?)
           `).bind(reseller.id, item.productId, item.packageId, -item.quantity, created.id, "Customer sale " + orderNumber + " (" + item.pkg.package_label + ")"));
+          if (item.unitIds.length) {
+            for (const unitId of item.unitIds) {
+              statements.push(env.DB.prepare(`
+                UPDATE reseller_stock_units SET status = 'sold', reseller_order_id = ?, reseller_note = ?,
+                  expected_payment_date = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND reseller_id = ? AND status = 'available'
+              `).bind(created.id, clean(body.customer_notes, 2000), clean(body.expected_payment_date, 10), unitId, reseller.id));
+            }
+          }
           if (item.creditQuantity > 0) {
             statements.push(env.DB.prepare(`
               INSERT INTO reseller_company_ledger
