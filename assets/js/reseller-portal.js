@@ -356,6 +356,74 @@ async function loadLedger() {
     }
   } catch (e) { $("#ledger-status").textContent = e.message; }
 }
+function setProfileValues(reseller) {
+  const values = {
+    "profile-full-name": reseller.full_name || "",
+    "profile-phone": reseller.phone || "",
+    "profile-email": reseller.email || currentUser?.email || "",
+    "residential-street": reseller.residential_street || "",
+    "residential-area": reseller.residential_area || "",
+    "residential-city": reseller.residential_city || "",
+    "residential-province": reseller.residential_province || "",
+    "residential-postal-code": reseller.residential_postal_code || "",
+    "delivery-street": reseller.delivery_street || "",
+    "delivery-area": reseller.delivery_area || "",
+    "delivery-city": reseller.delivery_city || "",
+    "delivery-province": reseller.delivery_province || "",
+    "delivery-postal-code": reseller.delivery_postal_code || "",
+    "delivery-instructions": reseller.delivery_instructions || ""
+  };
+  for (const [id, value] of Object.entries(values)) { const field = $("#" + id); if (field) field.value = value; }
+  const same = reseller.delivery_same_as_residential === undefined || Number(reseller.delivery_same_as_residential) === 1;
+  $("#delivery-same-as-residential").checked = same;
+  $("#separate-delivery-fields").hidden = same;
+  for (const field of $("#separate-delivery-fields").querySelectorAll("input,select")) field.required = !same;
+  const required = ["profile-full-name","profile-phone","residential-street","residential-area","residential-city","residential-province","residential-postal-code"];
+  const complete = required.every(id => String($("#" + id).value || "").trim()) && (same || ["delivery-street","delivery-area","delivery-city","delivery-province","delivery-postal-code"].every(id => String($("#" + id).value || "").trim()));
+  $("#profile-status").textContent = complete ? "Your profile has the required details for stock ordering. Save any changes before checking out." : "Complete and save your residential and delivery details before placing a stock order.";
+  $("#profile-save-status").textContent = complete ? "Your required profile details are filled in." : "Stock ordering stays unavailable until required details are saved.";
+}
+$("#delivery-same-as-residential").addEventListener("change", () => {
+  const same = $("#delivery-same-as-residential").checked;
+  $("#separate-delivery-fields").hidden = same;
+  for (const field of $("#separate-delivery-fields").querySelectorAll("input,select")) field.required = !same;
+});
+$("#reseller-profile-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("#save-reseller-profile");
+  button.disabled = true;
+  $("#profile-save-status").textContent = "Saving your account details…";
+  const value = id => $("#" + id).value.trim();
+  const same = $("#delivery-same-as-residential").checked;
+  const body = {
+    full_name: value("profile-full-name"), phone: value("profile-phone"),
+    residential_street: value("residential-street"), residential_area: value("residential-area"),
+    residential_city: value("residential-city"), residential_province: value("residential-province"),
+    residential_postal_code: value("residential-postal-code"), delivery_same_as_residential: same,
+    delivery_street: same ? value("residential-street") : value("delivery-street"),
+    delivery_area: same ? value("residential-area") : value("delivery-area"),
+    delivery_city: same ? value("residential-city") : value("delivery-city"),
+    delivery_province: same ? value("residential-province") : value("delivery-province"),
+    delivery_postal_code: same ? value("residential-postal-code") : value("delivery-postal-code"),
+    delivery_instructions: value("delivery-instructions")
+  };
+  try {
+    const result = await api("profile", "POST", body);
+    const reseller = result.data?.reseller;
+    if (reseller) {
+      $("#welcome-text").textContent = "Welcome, " + (reseller.full_name || "reseller") + ". Manage your M.H.R. reseller activity here.";
+      $("#account-details").textContent = (reseller.full_name || "") + " · " + reseller.email + " · " + (reseller.phone || "");
+  setProfileValues(reseller);
+      setProfileValues(reseller);
+    }
+    $("#profile-save-status").textContent = "Your account and delivery details have been saved.";
+    $("#profile-status").textContent = "Profile saved successfully.";
+  } catch (error) {
+    $("#profile-save-status").textContent = error.message;
+    $("#profile-status").textContent = "We couldn't save your profile. Please check the required fields and try again.";
+  } finally { button.disabled = false; }
+});
+
 async function loadAccount() {
   currentUser = auth.currentUser;
   if (!currentUser) {
