@@ -116,8 +116,8 @@ export async function handleResellerPortal(request, env) {
         JOIN reseller_products p ON p.id = pkg.reseller_product_id
         JOIN reseller_stock_orders so ON so.id = u.stock_order_id
         LEFT JOIN reseller_orders o ON o.id = u.reseller_order_id
-        WHERE u.reseller_id = ?
-        ORDER BY u.created_at DESC, u.id DESC LIMIT 2000
+        WHERE u.reseller_id = ? AND u.status = 'available'
+        ORDER BY p.name, so.created_at DESC, u.unit_number ASC LIMIT 2000
       `).bind(reseller.id).all();
       return json({ success: true, data: { units: result.results || [] } });
     }
