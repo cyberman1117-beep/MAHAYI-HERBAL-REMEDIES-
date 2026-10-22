@@ -413,7 +413,6 @@ $("#reseller-profile-form").addEventListener("submit", async (event) => {
     if (reseller) {
       $("#welcome-text").textContent = "Welcome, " + (reseller.full_name || "reseller") + ". Manage your M.H.R. reseller activity here.";
       $("#account-details").textContent = (reseller.full_name || "") + " · " + reseller.email + " · " + (reseller.phone || "");
-  setProfileValues(reseller);
       setProfileValues(reseller);
     }
     $("#profile-save-status").textContent = "Your account and delivery details have been saved.";
@@ -457,6 +456,7 @@ async function loadAccount() {
   showPanel("#dashboard-panel");
   $("#welcome-text").textContent = "Welcome, " + (reseller.full_name || "reseller") + ". Manage your M.H.R. reseller activity here.";
   $("#account-details").textContent = (reseller.full_name || "") + " · " + reseller.email + " · " + (reseller.phone || "");
+  setProfileValues(reseller);
   $("#pay-later-note").textContent = Number(reseller.pay_later_enabled) === 1 ? "M.H.R. has granted your account restricted distributor privileges. Standard upfront stock orders remain available here; arrange the approved pay-later stock issue and settlement terms directly with M.H.R." : "The standard buy-stock-first arrangement is active for your account. Receiving stock and paying later is restricted to distributors approved by M.H.R.";
   $(".admin-status").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved distributor" : "Standard reseller";
   $(".admin-stats .stat-card:nth-child(3) strong").textContent = Number(reseller.pay_later_enabled) === 1 ? "Approved" : "No access";
