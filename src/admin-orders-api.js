@@ -71,6 +71,48 @@ export async function handleAdminOrders(request, env) {
     await requireAdmin(request, env);
 
     const url = new URL(request.url);
+    const report = clean(url.searchParams.get("report")).toLowerCase();
+    if (request.method === "GET" && report === "monthly-sales") {
+      const allowedMonths = new Set([3, 6, 12, 24]);
+      const requestedMonths = Number(url.searchParams.get("months") || 6);
+      const months = allowedMonths.has(requestedMonths) ? requestedMonths : 6;
+      const startOffset = -(months - 1);
+      const startMonth = await env.DB.prepare(
+        "SELECT strftime('%Y-%m', date('now', ? || ' months', 'start of month')) AS month"
+      ).bind(String(startOffset)).first();
+      const start = startMonth?.month || new Date().toISOString().slice(0, 7);
+      const retail = await env.DB.prepare(`
+        SELECT strftime('%Y-%m', created_at) AS month,
+               COUNT(*) AS order_count,
+               COALESCE(SUM(total), 0) AS revenue
+        FROM orders
+        WHERE payment_status = 'paid'
+          AND order_status <> 'cancelled'
+          AND strftime('%Y-%m', created_at) >= ?
+        GROUP BY strftime('%Y-%m', created_at)
+        ORDER BY month
+      `).bind(start).all();
+      const reseller = await env.DB.prepare(`
+        SELECT strftime('%Y-%m', sale_date) AS month,
+               COUNT(*) AS order_count,
+               COALESCE(SUM(subtotal), 0) AS revenue
+        FROM reseller_orders
+        WHERE order_status <> 'cancelled'
+          AND strftime('%Y-%m', sale_date) >= ?
+        GROUP BY strftime('%Y-%m', sale_date)
+        ORDER BY month
+      `).bind(start).all();
+      return json({
+        success: true,
+        data: {
+          months,
+          start_month: start,
+          retail: retail.results ?? [],
+          reseller: reseller.results ?? []
+        }
+      });
+    }
+
     const idValue = clean(url.searchParams.get("id"));
 
     if (request.method === "GET") {
