@@ -108,13 +108,14 @@ export async function handleResellerPortal(request, env) {
       if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
       const result = await env.DB.prepare(`
         SELECT u.id AS unit_id, u.tracking_code, u.product_sku, u.status, u.reseller_note, u.expected_payment_date,
-               u.reseller_order_id, u.created_at, p.name AS product_name, p.currency, pkg.package_label,
+               u.reseller_order_id, o.order_number AS sale_order_number, o.sale_date, u.created_at, p.name AS product_name, p.currency, pkg.package_label,
                pkg.resale_amount AS customer_price, pkg.stock_amount AS stock_price, pkg.commission AS reseller_share,
                so.order_number AS stock_order_number, so.created_at AS stock_order_date
         FROM reseller_stock_units u
         JOIN reseller_product_packages pkg ON pkg.id = u.package_id
         JOIN reseller_products p ON p.id = pkg.reseller_product_id
         JOIN reseller_stock_orders so ON so.id = u.stock_order_id
+        LEFT JOIN reseller_orders o ON o.id = u.reseller_order_id
         WHERE u.reseller_id = ?
         ORDER BY u.created_at DESC, u.id DESC LIMIT 2000
       `).bind(reseller.id).all();
