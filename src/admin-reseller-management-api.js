@@ -140,6 +140,22 @@ async function stockOrders(request, env, id) {
         company_notes = ?, inventory_applied_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?
     `).bind(paymentStatus, orderStatus, reference, notes, id));
     await env.DB.batch(statements);
+  } else if (orderStatus === "fulfilled" && existing.inventory_applied_at) {
+    // Repair missing unit-register rows for previously fulfilled orders without applying inventory twice.
+    const items = await env.DB.prepare("SELECT id, package_id, product_sku, quantity, units_per_package FROM reseller_stock_order_items WHERE reseller_stock_order_id = ?").bind(id).all();
+    const repairStatements = [];
+    for (const item of (items.results || [])) {
+      if (!item.package_id) return json({ success: false, error: "A package in this order is no longer available. Unit-register repair was stopped." }, 409);
+      const unitQuantity = Number(item.quantity) * Number(item.units_per_package || 1);
+      if (!Number.isInteger(unitQuantity) || unitQuantity < 1 || unitQuantity > 10000) return json({ success: false, error: "The saved item quantity is invalid. Unit-register repair was stopped." }, 409);
+      for (let unitNumber = 1; unitNumber <= unitQuantity; unitNumber++) {
+        const sku = String(item.product_sku || "").trim();
+        const trackingCode = "MHR-R" + existing.reseller_id + "-O" + id + "-I" + item.id + "-U" + unitNumber;
+        repairStatements.push(env.DB.prepare("INSERT INTO reseller_stock_units (reseller_id, stock_order_id, stock_order_item_id, package_id, unit_number, product_sku, tracking_code) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(stock_order_item_id, unit_number) DO NOTHING").bind(existing.reseller_id, id, item.id, item.package_id, unitNumber, sku, trackingCode));
+      }
+    }
+    repairStatements.push(env.DB.prepare("UPDATE reseller_stock_orders SET payment_status = ?, order_status = ?, payment_reference = ?, company_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(paymentStatus, orderStatus, reference, notes, id));
+    await env.DB.batch(repairStatements);
   } else {
     await env.DB.prepare(`
       UPDATE reseller_stock_orders SET payment_status = ?, order_status = ?, payment_reference = ?,
