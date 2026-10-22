@@ -213,9 +213,15 @@ export async function handleResellerPortal(request, env) {
       if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
       if (request.method === "GET") {
         const orders = await env.DB.prepare(`
-          SELECT id, order_number, customer_full_name, customer_phone, currency, subtotal,
-                 reseller_earnings, company_earnings, payment_status, order_status, created_at
-          FROM reseller_orders WHERE reseller_id = ? ORDER BY created_at DESC, id DESC LIMIT 100
+          SELECT o.id, o.order_number, o.customer_full_name, o.customer_phone, o.currency, o.subtotal,
+                 o.reseller_earnings, o.company_earnings, o.payment_status, o.order_status, o.created_at,
+                 COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) AS amount_collected
+          FROM reseller_orders o WHERE o.reseller_id = ? ORDER BY o.created_at DESC, o.id DESC LIMIT 100
+        `).bind(reseller.id).all();
+        const payments = await env.DB.prepare(`
+          SELECT p.id, p.reseller_order_id, p.amount, p.payment_date, p.payment_method, p.payment_reference, p.notes
+          FROM reseller_customer_payments p JOIN reseller_orders o ON o.id = p.reseller_order_id
+          WHERE o.reseller_id = ? ORDER BY p.payment_date DESC, p.id DESC
         `).bind(reseller.id).all();
         const items = await env.DB.prepare(`
           SELECT i.reseller_order_id, i.product_name, i.package_label, i.quantity, i.customer_unit_price,
@@ -223,7 +229,7 @@ export async function handleResellerPortal(request, env) {
           FROM reseller_order_items i JOIN reseller_orders o ON o.id = i.reseller_order_id
           WHERE o.reseller_id = ? ORDER BY i.id
         `).bind(reseller.id).all();
-        return json({ success: true, data: { sales: orders.results || [], items: items.results || [] } });
+        return json({ success: true, data: { sales: orders.results || [], items: items.results || [], payments: payments.results || [] } });
       }
       if (request.method !== "POST") return json({ success: false, error: "Method not allowed." }, 405);
       const body = await request.json();
@@ -258,7 +264,9 @@ export async function handleResellerPortal(request, env) {
         companyEarnings = Math.round((companyEarnings + companyLine) * 100) / 100;
         saleItems.push({ pkg, packageId, productId: Number(pkg.product_id), quantity, creditQuantity, lineTotal, resellerLine, companyLine });
       }
-      const paymentStatus = body.payment_status === "pending" ? "pending" : "paid";
+      const initialPayment = Math.round(Number(body.amount_collected || 0) * 100) / 100;
+      if (!Number.isFinite(initialPayment) || initialPayment < 0 || initialPayment > subtotal + 0.001) return json({ success: false, error: "Enter a valid customer payment amount no greater than the sale total." }, 400);
+      const paymentStatus = initialPayment + 0.001 >= subtotal ? "paid" : "pending";
       const customerName = clean(body.customer_full_name, 160);
       const customerPhone = clean(body.customer_phone, 40);
       const orderNumber = "MHR-SALE-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + crypto.randomUUID().slice(0,8).toUpperCase();
@@ -298,12 +306,38 @@ export async function handleResellerPortal(request, env) {
             `).bind(reseller.id, item.productId, item.packageId, Math.round(Number(item.pkg.stock_amount) * item.creditQuantity * 100) / 100, created.id, "Company share due from sale " + orderNumber + " (" + item.pkg.package_label + ")"));
           }
         }
+        if (initialPayment > 0) {
+          statements.push(env.DB.prepare(`
+            INSERT INTO reseller_customer_payments (reseller_order_id, amount, payment_date, payment_method, payment_reference, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `).bind(created.id, initialPayment, clean(body.payment_date, 40) || new Date().toISOString(), clean(body.payment_method, 80), clean(body.payment_reference, 200), clean(body.payment_notes, 1000)));
+        }
         await env.DB.batch(statements);
       } catch (error) {
         await env.DB.prepare("DELETE FROM reseller_orders WHERE id = ?").bind(created.id).run();
         throw error;
       }
-      return json({ success: true, data: { id: created.id, order_number: orderNumber, subtotal, reseller_earnings: resellerEarnings, currency, payment_status: paymentStatus } }, 201);
+      return json({ success: true, data: { id: created.id, order_number: orderNumber, subtotal, amount_collected: initialPayment, customer_balance: Math.round((subtotal - initialPayment) * 100) / 100, reseller_earnings: resellerEarnings, currency, payment_status: paymentStatus } }, 201);
+    }
+    if (action === "sales-payments" && request.method === "POST") {
+      const reseller = await getReseller(token, env);
+      if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
+      const body = await request.json();
+      const orderId = Number(body.reseller_order_id);
+      const amount = Math.round(Number(body.amount) * 100) / 100;
+      if (!Number.isSafeInteger(orderId) || orderId <= 0 || !Number.isFinite(amount) || amount <= 0) return json({ success: false, error: "Choose a sale and enter a payment amount greater than zero." }, 400);
+      const order = await env.DB.prepare("SELECT id, subtotal, currency FROM reseller_orders WHERE id = ? AND reseller_id = ?").bind(orderId, reseller.id).first();
+      if (!order) return json({ success: false, error: "Customer sale not found in your account." }, 404);
+      const collectedRow = await env.DB.prepare("SELECT COALESCE(SUM(amount), 0) AS amount_collected FROM reseller_customer_payments WHERE reseller_order_id = ?").bind(orderId).first();
+      const collected = Math.round(Number(collectedRow?.amount_collected || 0) * 100) / 100;
+      const balance = Math.round((Number(order.subtotal) - collected) * 100) / 100;
+      if (amount > balance + 0.001) return json({ success: false, error: "Payment exceeds the customer's remaining balance of " + balance.toFixed(2) + "." }, 400);
+      const paymentDate = clean(body.payment_date, 40) || new Date().toISOString();
+      await env.DB.batch([
+        env.DB.prepare(`INSERT INTO reseller_customer_payments (reseller_order_id, amount, payment_date, payment_method, payment_reference, notes) VALUES (?, ?, ?, ?, ?, ?)`).bind(orderId, amount, paymentDate, clean(body.payment_method, 80), clean(body.payment_reference, 200), clean(body.notes, 1000)),
+        env.DB.prepare("UPDATE reseller_orders SET payment_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND reseller_id = ?").bind(amount + collected + 0.001 >= Number(order.subtotal) ? "paid" : "pending", orderId, reseller.id)
+      ]);
+      return json({ success: true, data: { reseller_order_id: orderId, amount_collected: Math.round((collected + amount) * 100) / 100, customer_balance: Math.max(0, Math.round((balance - amount) * 100) / 100) } }, 201);
     }
     return json({ success: false, error: "Choose a valid reseller portal action." }, 400);
   } catch (error) {
