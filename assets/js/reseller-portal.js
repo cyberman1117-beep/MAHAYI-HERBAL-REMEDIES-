@@ -20,7 +20,6 @@ let authFlowInProgress = false;
 let products = [];
 const cart = new Map();
 const mixedCart = new Map();
-const saleCart = new Map();
 const selectedStockUnits = new Map();
 let checkoutType = "packages";
 
@@ -232,27 +231,6 @@ function renderMixedCart() {
   $("#cart-count").textContent = cart.size + mixedCart.size + " item type" + (cart.size + mixedCart.size === 1 ? "" : "s");
   return chosen;
 }
-function renderSaleCart() {
-  const box = $("#sale-cart-items"); box.replaceChildren();
-  let total = 0; const chosen = [];
-  for (const [id, quantity] of saleCart) {
-    const found = findPackage(id); if (!found) continue;
-    const { product, pkg } = found;
-    total += Number(pkg.customer_price || 0) * quantity;
-    chosen.push({ package_id: id, quantity });
-    const row = document.createElement("div"); row.className = "admin-panel";
-    const details = document.createElement("div");
-    const title = document.createElement("h3"); title.textContent = product.name + " — " + pkg.package_label;
-    const amount = document.createElement("p"); amount.className = "muted"; amount.textContent = quantity + " × " + money(pkg.customer_price, product.currency) + " = " + money(Number(pkg.customer_price) * quantity, product.currency);
-    details.append(title, amount);
-    const remove = document.createElement("button"); remove.className = "button button-outline"; remove.type = "button"; remove.textContent = "Remove"; remove.addEventListener("click", () => { saleCart.delete(id); renderSaleCart(); });
-    row.append(details, remove); box.append(row);
-  }
-  if (!chosen.length) { const p = document.createElement("p"); p.className = "muted"; p.textContent = "No packages selected for a sale."; box.append(p); }
-  $("#sale-cart-total").textContent = "Customer sale total: " + money(total);
-  $("#record-sale").disabled = !chosen.length;
-  return chosen;
-}
 function updateSelectedStockTotal() {
   let total = 0;
   for (const unit of selectedStockUnits.values()) total += Number(unit.customer_price || 0);
@@ -400,7 +378,7 @@ async function loadAccount() {
   try {
     const productData = await api("products");
     renderProducts(productData.data?.products || []);
-    renderSaleCart();
+    updateSelectedStockTotal();
     const routeUrl = new URL(location.href); const mixedProduct = routeUrl.searchParams.get("mixed_product");
     if (mixedProduct) { const cartUrl = new URL("cart/", location.href); cartUrl.searchParams.set("mixed_product", mixedProduct); location.replace(cartUrl.href); return; }
   } catch (error) {
