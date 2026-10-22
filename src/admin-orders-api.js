@@ -81,18 +81,18 @@ export async function handleAdminOrders(request, env) {
         "SELECT strftime('%Y-%m', date('now', ? || ' months', 'start of month')) AS month"
       ).bind(String(startOffset)).first();
       const start = startMonth?.month || new Date().toISOString().slice(0, 7);
-      const retail = await env.DB.prepare(`
+      const companySales = await env.DB.prepare(`
         SELECT strftime('%Y-%m', created_at) AS month,
                COUNT(*) AS order_count,
-               COALESCE(SUM(total), 0) AS revenue
-        FROM orders
-        WHERE payment_status = 'paid'
-          AND order_status <> 'cancelled'
+               COALESCE(SUM(total_amount), 0) AS revenue
+        FROM reseller_stock_orders
+        WHERE order_status = 'fulfilled'
+          AND inventory_applied_at IS NOT NULL
           AND strftime('%Y-%m', created_at) >= ?
         GROUP BY strftime('%Y-%m', created_at)
         ORDER BY month
       `).bind(start).all();
-      const reseller = await env.DB.prepare(`
+      const resellerSales = await env.DB.prepare(`
         SELECT strftime('%Y-%m', sale_date) AS month,
                COUNT(*) AS order_count,
                COALESCE(SUM(subtotal), 0) AS revenue
@@ -107,8 +107,8 @@ export async function handleAdminOrders(request, env) {
         data: {
           months,
           start_month: start,
-          retail: retail.results ?? [],
-          reseller: reseller.results ?? []
+          company_sales: companySales.results ?? [],
+          reseller_sales: resellerSales.results ?? []
         }
       });
     }
