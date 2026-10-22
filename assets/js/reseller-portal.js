@@ -42,6 +42,7 @@ function setWorkspaceView(view) {
 document.querySelectorAll("[data-reseller-view]").forEach((button) => button.addEventListener("click", () => setWorkspaceView(button.dataset.resellerView)));
 
 $("#sale-payment-date").value = new Date().toISOString().slice(0, 10);
+$("#sale-date").value = new Date().toISOString().slice(0, 10);
 function setMode(nextMode) {
   mode = nextMode;
   const profileOnly = mode === "profile";
@@ -275,7 +276,7 @@ async function loadSales() {
       const lines = items.filter(item => Number(item.reseller_order_id) === Number(sale.id));
       const salePayments = payments.filter(payment => Number(payment.reseller_order_id) === Number(sale.id));
       const collected = Number(sale.amount_collected || 0), balance = Math.max(0, Number(sale.subtotal || 0) - collected);
-      const card = makeCard(sale.order_number, ["Customer: " + (sale.customer_full_name || "Not provided"), "Customer total: " + money(sale.subtotal, sale.currency), "Collected from customer: " + money(collected, sale.currency), "Customer still owes you: " + money(balance, sale.currency), "Your expected share: " + money(sale.reseller_earnings, sale.currency), "Payment status: " + (balance <= 0.001 ? "Paid in full" : "Partially paid / outstanding"), "Recorded: " + sale.created_at, ...lines.map(item => item.product_name + " × " + item.quantity), ...salePayments.map(payment => "Payment: " + money(payment.amount, sale.currency) + " · " + payment.payment_date + (payment.payment_method ? " · " + payment.payment_method : "") + (payment.payment_reference ? " · Ref " + payment.payment_reference : ""))]);
+      const card = makeCard(sale.order_number, ["Date sold: " + (sale.sale_date || String(sale.created_at || "").slice(0, 10)), ...lines.map(item => item.product_name + " — " + item.package_label + " × " + item.quantity + " · " + money(item.line_total, item.currency)), "Sale total: " + money(sale.subtotal, sale.currency), "Total received: " + money(collected, sale.currency), "Still outstanding: " + money(balance, sale.currency), "Your expected share: " + money(sale.reseller_earnings, sale.currency), "Status: " + (balance <= 0.001 ? "Paid in full" : collected > 0 ? "Part-paid" : "Unpaid"), ...salePayments.map(payment => "Money received: " + money(payment.amount, sale.currency) + " · Date: " + payment.payment_date + (payment.payment_method ? " · " + payment.payment_method : "") + (payment.payment_reference ? " · Ref " + payment.payment_reference : ""))]);
       if (balance > 0.001) {
         const addPayment = document.createElement("button"); addPayment.type = "button"; addPayment.className = "button button-outline"; addPayment.textContent = "Record customer payment";
         addPayment.addEventListener("click", async () => {
@@ -418,9 +419,9 @@ $("#record-sale").addEventListener("click", async () => {
   const items = renderSaleCart(); if (!items.length) return;
   const button = $("#record-sale"); button.disabled = true; $("#sale-cart-status").textContent = "Recording customer sale…";
   try {
-    const result = await api("sales", "POST", { items, customer_full_name: $("#sale-customer-name").value, customer_phone: $("#sale-customer-phone").value, amount_collected: $("#sale-amount-collected").value, payment_date: $("#sale-payment-date").value, payment_method: $("#sale-payment-method").value, payment_reference: $("#sale-payment-reference").value, customer_notes: $("#sale-note").value });
-    saleCart.clear(); $("#sale-customer-name").value = ""; $("#sale-customer-phone").value = ""; $("#sale-amount-collected").value = "0"; $("#sale-payment-date").value = new Date().toISOString().slice(0, 10); $("#sale-payment-method").value = ""; $("#sale-payment-reference").value = ""; $("#sale-note").value = ""; renderSaleCart();
-    $("#sale-cart-status").textContent = "Sale " + result.data.order_number + " recorded. Your share: " + money(result.data.reseller_earnings, result.data.currency) + ". Collected: " + money(result.data.amount_collected, result.data.currency) + ". Customer balance: " + money(result.data.customer_balance, result.data.currency) + ".";
+    const result = await api("sales", "POST", { items, sale_date: $("#sale-date").value, amount_collected: $("#sale-amount-collected").value, payment_date: $("#sale-payment-date").value, payment_method: $("#sale-payment-method").value, payment_reference: $("#sale-payment-reference").value });
+    saleCart.clear(); $("#sale-date").value = new Date().toISOString().slice(0, 10); $("#sale-amount-collected").value = "0"; $("#sale-payment-date").value = new Date().toISOString().slice(0, 10); $("#sale-payment-method").value = ""; $("#sale-payment-reference").value = ""; $("#sale-note").value = ""; renderSaleCart();
+    $("#sale-cart-status").textContent = "Sale " + result.data.order_number + " recorded for " + ($("#sale-date").value || "the selected date") + ". Your share: " + money(result.data.reseller_earnings, result.data.currency) + ". Collected: " + money(result.data.amount_collected, result.data.currency) + ". Customer balance: " + money(result.data.customer_balance, result.data.currency) + ".";
     await loadAccount();
   } catch (error) { $("#sale-cart-status").textContent = error.message; }
   finally { button.disabled = saleCart.size === 0; }
