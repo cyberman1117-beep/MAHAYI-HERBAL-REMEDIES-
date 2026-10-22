@@ -285,8 +285,9 @@ async function loadStockRegister() {
           updateSelectedStockTotal();
         });
         label.append(checkbox, textNode); head.append(label);
-      } else if (unit.reseller_note) {
-        const note = document.createElement("p"); note.className = "muted"; note.textContent = "Note: " + unit.reseller_note; head.append(note);
+      } else {
+        if (unit.expected_payment_date) { const due = document.createElement("p"); due.className = "muted"; due.textContent = "Expected collection: " + unit.expected_payment_date; head.append(due); }
+        if (unit.reseller_note) { const note = document.createElement("p"); note.className = "muted"; note.textContent = "Private note: " + unit.reseller_note; head.append(note); }
       }
       card.append(head); list.append(card);
     }
@@ -303,7 +304,7 @@ async function loadSales() {
       const lines = items.filter(item => Number(item.reseller_order_id) === Number(sale.id));
       const salePayments = payments.filter(payment => Number(payment.reseller_order_id) === Number(sale.id));
       const collected = Number(sale.amount_collected || 0), balance = Math.max(0, Number(sale.subtotal || 0) - collected);
-      const card = makeCard(sale.order_number, ["Date sold: " + (sale.sale_date || String(sale.created_at || "").slice(0, 10)), ...lines.map(item => item.product_name + " — " + item.package_label + " × " + item.quantity + " · " + money(item.line_total, item.currency)), "Sale total: " + money(sale.subtotal, sale.currency), "Total received: " + money(collected, sale.currency), "Still outstanding: " + money(balance, sale.currency), "Your expected share: " + money(sale.reseller_earnings, sale.currency), "Status: " + (balance <= 0.001 ? "Paid in full" : collected > 0 ? "Part-paid" : "Unpaid"), ...salePayments.map(payment => "Money received: " + money(payment.amount, sale.currency) + " · Date: " + payment.payment_date + (payment.payment_method ? " · " + payment.payment_method : "") + (payment.payment_reference ? " · Ref " + payment.payment_reference : ""))]);
+      const card = makeCard(sale.order_number, ["Date sold: " + (sale.sale_date || String(sale.created_at || "").slice(0, 10)), ...lines.map(item => item.product_name + " — " + item.package_label + " × " + item.quantity + " · " + money(item.line_total, item.currency)), "Sale total: " + money(sale.subtotal, sale.currency), "Total received: " + money(collected, sale.currency), "Still outstanding: " + money(balance, sale.currency), sale.expected_payment_date ? "Expected collection date: " + sale.expected_payment_date : "", sale.customer_notes ? "Your private note: " + sale.customer_notes : "", "Your expected share: " + money(sale.reseller_earnings, sale.currency), "Status: " + (balance <= 0.001 ? "Paid in full" : collected > 0 ? "Part-paid" : "Unpaid"), ...salePayments.map(payment => "Money received: " + money(payment.amount, sale.currency) + " · Date: " + payment.payment_date + (payment.payment_method ? " · " + payment.payment_method : "") + (payment.payment_reference ? " · Ref " + payment.payment_reference : ""))]);
       if (balance > 0.001) {
         const addPayment = document.createElement("button"); addPayment.type = "button"; addPayment.className = "button button-outline"; addPayment.textContent = "Record customer payment";
         addPayment.addEventListener("click", async () => {
