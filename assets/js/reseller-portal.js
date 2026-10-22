@@ -245,12 +245,30 @@ function renderSaleCart() {
 async function loadSales() {
   try {
     const result = await api("sales");
-    const sales = result.data?.sales || [], items = result.data?.items || [];
+    const sales = result.data?.sales || [], items = result.data?.items || [], payments = result.data?.payments || [];
     const list = $("#my-sales-list"); list.replaceChildren();
     $("#sales-status").textContent = sales.length ? sales.length + " customer sale(s)." : "You have not recorded a customer sale yet.";
     for (const sale of sales) {
       const lines = items.filter(item => Number(item.reseller_order_id) === Number(sale.id));
-      list.append(makeCard(sale.order_number, ["Customer: " + (sale.customer_full_name || "Not provided"), "Customer total: " + money(sale.subtotal, sale.currency), "Your share: " + money(sale.reseller_earnings, sale.currency), "Customer payment: " + sale.payment_status, "Date: " + sale.created_at, ...lines.map(item => item.product_name + " × " + item.quantity)]));
+      const salePayments = payments.filter(payment => Number(payment.reseller_order_id) === Number(sale.id));
+      const collected = Number(sale.amount_collected || 0), balance = Math.max(0, Number(sale.subtotal || 0) - collected);
+      const card = makeCard(sale.order_number, ["Customer: " + (sale.customer_full_name || "Not provided"), "Customer total: " + money(sale.subtotal, sale.currency), "Collected from customer: " + money(collected, sale.currency), "Customer still owes you: " + money(balance, sale.currency), "Your expected share: " + money(sale.reseller_earnings, sale.currency), "Payment status: " + (balance <= 0.001 ? "Paid in full" : "Partially paid / outstanding"), "Recorded: " + sale.created_at, ...lines.map(item => item.product_name + " × " + item.quantity), ...salePayments.map(payment => "Payment: " + money(payment.amount, sale.currency) + " · " + payment.payment_date + (payment.payment_method ? " · " + payment.payment_method : "") + (payment.payment_reference ? " · Ref " + payment.payment_reference : ""))]);
+      if (balance > 0.001) {
+        const addPayment = document.createElement("button"); addPayment.type = "button"; addPayment.className = "button button-outline"; addPayment.textContent = "Record customer payment";
+        addPayment.addEventListener("click", async () => {
+          const raw = prompt("Enter the amount received from this customer. Remaining balance: " + money(balance, sale.currency));
+          if (raw === null) return;
+          const amount = Number(raw);
+          if (!Number.isFinite(amount) || amount <= 0 || amount > balance + 0.001) { alert("Enter an amount greater than zero and no more than " + money(balance, sale.currency) + "."); return; }
+          const method = prompt("Payment method (cash, EFT, etc.)", "") || "";
+          const date = prompt("Payment date (YYYY-MM-DD)", new Date().toISOString().slice(0, 10)) || new Date().toISOString().slice(0, 10);
+          const reference = prompt("Payment reference (optional)", "") || "";
+          try { await api("sales-payments", "POST", { reseller_order_id: sale.id, amount, payment_method: method, payment_date: date, payment_reference: reference }); await loadSales(); }
+          catch (error) { alert(error.message); }
+        });
+        card.append(addPayment);
+      }
+      list.append(card);
     }
   } catch (e) { $("#sales-status").textContent = e.message; }
 }
@@ -377,7 +395,7 @@ $("#record-sale").addEventListener("click", async () => {
   const items = renderSaleCart(); if (!items.length) return;
   const button = $("#record-sale"); button.disabled = true; $("#sale-cart-status").textContent = "Recording customer sale…";
   try {
-    const result = await api("sales", "POST", { items, customer_full_name: $("#sale-customer-name").value, customer_phone: $("#sale-customer-phone").value, payment_status: $("#sale-payment-status").value, customer_notes: $("#sale-note").value });
+    const result = await api("sales", "POST", { items, customer_full_name: $("#sale-customer-name").value, customer_phone: $("#sale-customer-phone").value, amount_collected: $("#sale-amount-collected").value, payment_date: $("#sale-payment-date").value, payment_method: $("#sale-payment-method").value, payment_reference: $("#sale-payment-reference").value, customer_notes: $("#sale-note").value });
     saleCart.clear(); $("#sale-customer-name").value = ""; $("#sale-customer-phone").value = ""; $("#sale-note").value = ""; renderSaleCart();
     $("#sale-cart-status").textContent = "Sale " + result.data.order_number + " recorded. Your share: " + money(result.data.reseller_earnings, result.data.currency) + ".";
     await loadAccount();
