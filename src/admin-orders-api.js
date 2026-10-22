@@ -82,14 +82,14 @@ export async function handleAdminOrders(request, env) {
       ).bind(String(startOffset)).first();
       const start = startMonth?.month || new Date().toISOString().slice(0, 7);
       const companySales = await env.DB.prepare(`
-        SELECT strftime('%Y-%m', created_at) AS month,
+        SELECT strftime('%Y-%m', inventory_applied_at) AS month,
                COUNT(*) AS order_count,
                COALESCE(SUM(total_amount), 0) AS revenue
         FROM reseller_stock_orders
         WHERE order_status = 'fulfilled'
           AND inventory_applied_at IS NOT NULL
-          AND strftime('%Y-%m', created_at) >= ?
-        GROUP BY strftime('%Y-%m', created_at)
+          AND strftime('%Y-%m', inventory_applied_at) >= ?
+        GROUP BY strftime('%Y-%m', inventory_applied_at)
         ORDER BY month
       `).bind(start).all();
       const resellerSales = await env.DB.prepare(`
