@@ -53,7 +53,9 @@ async function stockOrders(request, env, id) {
     const result = await env.DB.prepare(`
       SELECT o.id, o.order_number, o.reseller_id, r.full_name AS reseller_name, r.email AS reseller_email,
              o.currency, o.total_amount, o.payment_status, o.order_status, o.fulfilment_mode, o.payment_reference,
-             o.reseller_notes, o.company_notes, o.stock_reserved_at, o.stock_released_at, o.inventory_applied_at, o.created_at, o.updated_at,
+             o.reseller_notes, o.company_notes, o.stock_reserved_at, o.stock_released_at, o.inventory_applied_at,
+             o.delivery_name, o.delivery_phone, o.delivery_street, o.delivery_area, o.delivery_city, o.delivery_province, o.delivery_postal_code, o.delivery_instructions,
+             o.created_at, o.updated_at,
              (SELECT COUNT(*) FROM reseller_stock_order_items i WHERE i.reseller_stock_order_id = o.id) AS item_count
       FROM reseller_stock_orders o JOIN resellers r ON r.id = o.reseller_id
       ORDER BY o.created_at DESC, o.id DESC
