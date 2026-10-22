@@ -8,22 +8,113 @@
   <link rel="stylesheet" href="../assets/css/styles.css">
   <script type="module" src="../assets/js/firebase-auth.js"></script>
   <script src="../assets/js/site.js" defer></script>
+  <style>
+    .sales-report{margin:0 0 var(--space-8);padding:clamp(16px,3vw,28px);border:1px solid var(--color-border);background:var(--color-surface);min-width:0}
+    .sales-report-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+    .sales-report-head h2{margin-bottom:6px}
+    .sales-report-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .sales-report-tools select{max-width:100%;min-height:42px;padding:8px 12px;border:1px solid var(--color-border-strong);background:var(--color-surface);color:var(--color-text)}
+    .sales-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:22px 0}
+    .sales-kpi{min-width:0;padding:16px;border:1px solid var(--color-border);background:var(--color-background)}
+    .sales-kpi span{display:block;color:var(--color-text-muted);font-size:13px}
+    .sales-kpi strong{display:block;margin-top:8px;font-size:clamp(18px,2.5vw,27px);line-height:1.2;overflow-wrap:anywhere}
+    .sales-chart-wrap{width:100%;min-width:0;overflow:hidden}
+    .sales-chart{display:block;width:100%;height:auto;min-height:180px;overflow:visible}
+    .sales-chart text{font-family:inherit;fill:var(--color-text-muted);font-size:11px}
+    .sales-legend{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0 0;font-size:13px;color:var(--color-text-muted)}
+    .sales-legend span{display:inline-flex;align-items:center;gap:7px}
+    .sales-legend i{display:inline-block;width:18px;height:3px;border-radius:4px;background:currentColor}
+    .sales-legend .retail-key{color:#287a57}.sales-legend .reseller-key{color:#9a7655}
+    .sales-report-note{font-size:12px;color:var(--color-text-muted);margin-top:12px}
+    .sales-report-status{min-height:20px;margin-top:8px;font-size:13px;color:var(--color-text-muted)}
+    .sales-chart-empty{padding:34px 12px;text-align:center;color:var(--color-text-muted);border:1px dashed var(--color-border)}
+    @media(max-width:620px){.sales-kpis{grid-template-columns:1fr}.sales-kpi{padding:13px}.sales-report-head{display:block}.sales-report-tools{margin-top:16px}.sales-report-tools select,.sales-report-tools button{flex:1}.sales-chart text{font-size:10px}}
+  </style>
 </head>
 <body class="admin-page">
   <a class="skip-link" href="#admin-main">Skip to content</a>
   <header class="admin-header"><div class="container header-inner"><a class="brand" href="../index.html">MAHAYI HERBAL REMEDIES <span class="admin-label">Admin</span></a><div class="admin-account"><span class="status-dot" aria-hidden="true"></span><span data-admin-account>Admin account</span><button class="button button-small button-outline" type="button" data-admin-logout>Log out</button></div></div></header>
   <main id="admin-main" class="admin-main"><div class="container">
-    <div class="admin-intro"><div><p class="eyebrow">Store control center</p><h1>Dashboard</h1><p class="muted">Manage your storefront from one place.</p></div><span class="admin-status">Setup in progress</span></div>
-    <section class="admin-stats" aria-label="Store overview"><div class="stat-card"><span class="muted">Products</span><strong>—</strong><small>Coming soon</small></div><div class="stat-card"><span class="muted">Orders</span><strong>—</strong><small>Coming soon</small></div><div class="stat-card"><span class="muted">Store status</span><strong>Draft</strong><small>Configuration needed</small></div></section>
+    <div class="admin-intro"><div><p class="eyebrow">Store control center</p><h1>Dashboard</h1><p class="muted">Your sales performance and store management in one place.</p></div><span class="admin-status">Live sales report</span></div>
+    <section class="sales-report" aria-labelledby="sales-report-title">
+      <div class="sales-report-head"><div><p class="eyebrow">Business performance</p><h2 id="sales-report-title">Sales over time</h2><p class="muted">Monthly sales from recorded retail orders and reseller customer sales.</p></div>
+        <div class="sales-report-tools"><label for="sales-period" class="muted">Period</label><select id="sales-period"><option value="3">Last 3 months</option><option value="6" selected>Last 6 months</option><option value="12">Last 12 months</option><option value="24">Last 24 months</option></select><button class="button button-outline" id="sales-refresh" type="button">Refresh</button></div>
+      </div>
+      <div class="sales-kpis" aria-live="polite">
+        <div class="sales-kpi"><span>Retail revenue · paid orders</span><strong id="retail-revenue">—</strong></div>
+        <div class="sales-kpi"><span>Retail paid orders</span><strong id="retail-orders">—</strong></div>
+        <div class="sales-kpi"><span>Reseller customer sales</span><strong id="reseller-revenue">—</strong></div>
+      </div>
+      <div id="sales-chart-region" class="sales-chart-wrap"><div class="sales-chart-empty">Loading recorded sales…</div></div>
+      <div class="sales-legend"><span class="retail-key"><i></i>Retail paid order totals</span><span class="reseller-key"><i></i>Reseller customer sales</span></div>
+      <p class="sales-report-note">Retail revenue includes shipping charged on paid orders. Reseller sales use recorded customer-sale subtotals and are shown separately; they are not added to retail revenue. Cancelled orders are excluded.</p>
+      <p class="sales-report-status" id="sales-report-status" role="status" aria-live="polite"></p>
+    </section>
+    <section class="admin-stats" aria-label="Store overview"><div class="stat-card"><span class="muted">Products</span><strong>—</strong><small>Catalogue management</small></div><div class="stat-card"><span class="muted">Orders</span><strong id="dashboard-order-count">—</strong><small>Paid retail orders in selected period</small></div><div class="stat-card"><span class="muted">Store status</span><strong>Active</strong><small>Manage configuration below</small></div></section>
     <div class="admin-sections">
       <section class="admin-panel" id="reseller-programme"><div class="panel-icon">RS</div><div><h2>Reseller Programme</h2><p class="muted">Manage reseller-only products, categories, customer prices, and profit sharing separately from the regular shop.</p></div><a class="button button-outline" href="resellers/">Manage reseller catalogue</a></section>
       <section class="admin-panel" id="products"><div class="panel-icon">01</div><div><h2>Products</h2><p class="muted">Add, edit, organize, and manage inventory for your products.</p></div><a class="button button-outline" href="products/">Manage products</a></section>
       <section class="admin-panel" id="categories"><div class="panel-icon">02</div><div><h2>Categories</h2><p class="muted">Create, organize, enable, disable, and manage the categories used by your products.</p></div><a class="button button-outline" href="categories/">Manage categories</a></section>
       <section class="admin-panel" id="orders"><div class="panel-icon">03</div><div><h2>Orders</h2><p class="muted">Review customer orders and keep fulfillment details up to date.</p></div><a class="button button-outline" href="orders/">View orders</a></section>
       <section class="admin-panel" id="customers"><div class="panel-icon">04</div><div><h2>Customers</h2><p class="muted">View and manage customer information saved from the public storefront.</p></div><a class="button button-outline" href="customers/">Manage customers</a></section>
-      <section class="admin-panel" id="settings"><div class="panel-icon">05</div><div><h2>Store settings</h2><p class="muted">Configure store details, social links, and future integrations.</p></div><a class="button button-outline" href="settings/">Open settings</a></section><section class="admin-panel" id="communications"><div class="panel-icon">06</div><div><h2>Communications</h2><p class="muted">Read and reply to customer live-chat conversations.</p></div><a class="button button-outline" href="communications/">Open communications</a></section><section class="admin-panel" id="shipping"><div class="panel-icon">07</div><div><h2>Shipping</h2><p class="muted">Configure local delivery areas, manual PAXI rates, and future courier integrations.</p></div><a class="button button-outline" href="shipping/">Manage shipping</a></section><section class="admin-panel" id="information"><div class="panel-icon">08</div><div><h2>Information Pages</h2><p class="muted">Update customer-facing policies, terms, shipping information, and other store pages.</p></div><a class="button button-outline" href="content/">Manage information pages</a></section><section class="admin-panel" id="seo"><div class="panel-icon">09</div><div><h2>SEO / Search Engine</h2><p class="muted">Manage search visibility, indexing, and search-engine metadata for the storefront.</p></div><a class="button button-outline" href="seo/">Manage SEO</a></section>
+      <section class="admin-panel" id="settings"><div class="panel-icon">05</div><div><h2>Store settings</h2><p class="muted">Configure store details, social links, and future integrations.</p></div><a class="button button-outline" href="settings/">Open settings</a></section>
+      <section class="admin-panel" id="communications"><div class="panel-icon">06</div><div><h2>Communications</h2><p class="muted">Read and reply to customer live-chat conversations.</p></div><a class="button button-outline" href="communications/">Open communications</a></section>
+      <section class="admin-panel" id="shipping"><div class="panel-icon">07</div><div><h2>Shipping</h2><p class="muted">Configure local delivery areas, manual PAXI rates, and courier integrations.</p></div><a class="button button-outline" href="shipping/">Manage shipping</a></section>
+      <section class="admin-panel" id="information"><div class="panel-icon">08</div><div><h2>Information Pages</h2><p class="muted">Update customer-facing policies, terms, shipping information, and other store pages.</p></div><a class="button button-outline" href="content/">Manage information pages</a></section>
+      <section class="admin-panel" id="seo"><div class="panel-icon">09</div><div><h2>SEO / Search Engine</h2><p class="muted">Manage search visibility, indexing, and search-engine metadata for the storefront.</p></div><a class="button button-outline" href="seo/">Manage SEO</a></section>
     </div>
   </div></main>
   <footer class="site-footer"><div class="container footer-inner"><a class="brand" href="../index.html">MAHAYI HERBAL REMEDIES</a><p>© <span data-current-year>2026</span> MAHAYI HERBAL REMEDIES</p><a href="../index.html">View storefront</a></div></footer>
+  <script type="module">
+    const $ = (selector) => document.querySelector(selector);
+    const period = $('#sales-period');
+    const status = $('#sales-report-status');
+    const region = $('#sales-chart-region');
+    const formatMoney = (value) => new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR',maximumFractionDigits:0}).format(Number(value)||0);
+    const monthLabel = (value) => { const [year,month]=value.split('-').map(Number); return new Date(year,month-1,1).toLocaleDateString('en-ZA',{month:'short',year:'2-digit'}); };
+    function drawChart(months, retailRows, resellerRows) {
+      const retailMap=new Map(retailRows.map(row=>[row.month,Number(row.revenue)||0]));
+      const resellerMap=new Map(resellerRows.map(row=>[row.month,Number(row.revenue)||0]));
+      const labels=[];
+      const now=new Date();
+      const count=Number(period.value)||6;
+      for(let offset=count-1;offset>=0;offset--){const d=new Date(now.getFullYear(),now.getMonth()-offset,1);labels.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));}
+      const retail=labels.map(m=>retailMap.get(m)||0), reseller=labels.map(m=>resellerMap.get(m)||0);
+      const max=Math.max(1,...retail,...reseller), w=760,h=280,left=54,right=14,top=18,bottom=42,plotW=w-left-right,plotH=h-top-bottom;
+      const x=i=>left+(labels.length===1?plotW/2:i*plotW/(labels.length-1));
+      const y=v=>top+plotH-(v/max)*plotH;
+      const points=values=>values.map((v,i)=>x(i)+','+y(v)).join(' ');
+      const grid=[0,.25,.5,.75,1].map(frac=>{const yy=top+plotH-frac*plotH;return '<line x1="'+left+'" y1="'+yy+'" x2="'+(w-right)+'" y2="'+yy+'" stroke="currentColor" opacity=".12"/><text x="'+(left-8)+'" y="'+(yy+4)+'" text-anchor="end">'+(max*frac>=1000?'R'+(max*frac/1000).toFixed(1)+'k':'R'+Math.round(max*frac))+'</text>';}).join('');
+      const xLabels=labels.map((m,i)=>'<text x="'+x(i)+'" y="'+(h-12)+'" text-anchor="middle">'+monthLabel(m)+'</text>').join('');
+      const retailDots=retail.map((v,i)=>'<circle cx="'+x(i)+'" cy="'+y(v)+'" r="3.5" fill="#287a57"><title>'+monthLabel(labels[i])+': retail '+formatMoney(v)+'</title></circle>').join('');
+      const resellerDots=reseller.map((v,i)=>'<circle cx="'+x(i)+'" cy="'+y(v)+'" r="3.5" fill="#9a7655"><title>'+monthLabel(labels[i])+': reseller '+formatMoney(v)+'</title></circle>').join('');
+      region.innerHTML='<svg class="sales-chart" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="Monthly retail and reseller sales trend. Hover or tap a point for its value.">'+grid+'<polyline points="'+points(retail)+'" fill="none" stroke="#287a57" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polyline points="'+points(reseller)+'" fill="none" stroke="#9a7655" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'+retailDots+resellerDots+xLabels+'</svg>';
+      if(!retail.some(v=>v>0)&&!reseller.some(v=>v>0))status.textContent='No recorded sales for this period yet. The graph is showing zero values, not sample data.';
+    }
+    async function loadSales(){
+      status.textContent='Loading recorded sales…';region.innerHTML='<div class="sales-chart-empty">Loading recorded sales…</div>';
+      try{
+        if(typeof window.getAdminIdToken!=='function')throw Error('Admin sign-in is still loading. Refresh this page in a moment.');
+        const token=await window.getAdminIdToken();
+        const url=new URL('/api/admin-orders',location.origin);url.searchParams.set('report','monthly-sales');url.searchParams.set('months',period.value);
+        const response=await fetch(url,{headers:{Authorization:'Bearer '+token,Accept:'application/json'},cache:'no-store'});
+        const payload=await response.json().catch(()=>({}));
+        if(!response.ok||!payload.success)throw Error(payload.error||'Unable to load the sales report.');
+        const data=payload.data||{},retail=data.retail||[],reseller=data.reseller||[];
+        const retailRevenue=retail.reduce((sum,row)=>sum+(Number(row.revenue)||0),0);
+        const retailOrders=retail.reduce((sum,row)=>sum+(Number(row.order_count)||0),0);
+        const resellerRevenue=reseller.reduce((sum,row)=>sum+(Number(row.revenue)||0),0);
+        $('#retail-revenue').textContent=formatMoney(retailRevenue);
+        $('#retail-orders').textContent=String(retailOrders);
+        $('#reseller-revenue').textContent=formatMoney(resellerRevenue);
+        $('#dashboard-order-count').textContent=String(retailOrders);
+        drawChart(Number(data.months)||Number(period.value),retail,reseller);
+        if(status.textContent==='Loading recorded sales…')status.textContent='Updated from saved sales records.';
+      }catch(error){region.innerHTML='<div class="sales-chart-empty">Sales data could not be loaded.</div>';status.textContent=error.message||'Sales report unavailable.';$('#retail-revenue').textContent='—';$('#retail-orders').textContent='—';$('#reseller-revenue').textContent='—';$('#dashboard-order-count').textContent='—';}
+    }
+    period.addEventListener('change',loadSales);
+    $('#sales-refresh').addEventListener('click',loadSales);
+    loadSales();
+  </script>
 </body>
 </html>
