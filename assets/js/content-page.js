@@ -34,7 +34,7 @@ const load = async () => {
     if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error || "Information page not found.");
 
     const page = payload.data;
-    document.title = page.title + " | Clothing Store";
+    document.title = page.title + " | MAHAYI HERBAL REMEDIES";
     if (titleElement) titleElement.textContent = page.title;
     if (contentElement) {
       contentElement.textContent = page.content || "This information page has not been published yet.";

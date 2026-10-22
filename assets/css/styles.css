@@ -1009,3 +1009,14 @@ body.customer-sticky-chat-open{overflow:hidden}
  .reseller-cart-quantity-label { grid-column:1 / -1; }
  .reseller-cart-quantity-controls .reseller-cart-remove { justify-self:start; }
 }
+
+
+/* Shared information links on storefront and reseller portal footers. */
+.information-footer-links { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem 1rem; font-size:var(--font-size-sm); }
+.information-footer-links strong { color:var(--color-text); }
+.information-footer-links [data-information-links] { display:flex; flex-wrap:wrap; gap:.5rem 1rem; }
+.information-footer-links a { color:var(--color-text-muted); text-decoration:underline; text-underline-offset:3px; }
+.information-footer-links a:hover { color:var(--color-brand-secondary); }
+.footer-grid .information-footer-links { display:block; }
+.footer-grid .information-footer-links [data-information-links] { display:flex; flex-direction:column; align-items:flex-start; gap:.5rem; }
+@media (max-width:640px) { .information-footer-links { align-items:flex-start; flex-direction:column; } }
