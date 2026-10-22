@@ -24,6 +24,7 @@ const saleCart = new Map();
 let checkoutType = "packages";
 
 function showPanel(selector) { panels.forEach((panel) => { $(panel).hidden = panel !== selector; }); }
+$("#sale-payment-date").value = new Date().toISOString().slice(0, 10);
 function setMode(nextMode) {
   mode = nextMode;
   const profileOnly = mode === "profile";
@@ -278,7 +279,7 @@ async function loadInventoryAndOrders() {
     const list = $("#inventory-list"); list.replaceChildren();
     const items = inv.data?.inventory || [];
     $("#inventory-status").textContent = items.length ? items.length + " inventory product(s)." : "No stock has been released to your inventory yet.";
-    for (const item of items) list.append(makeCard(item.name + (item.package_label ? " — " + item.package_label : ""), ["Available quantity: " + item.quantity_available, "SKU: " + (item.sku || "—"), "Last updated: " + item.updated_at]));
+    for (const item of items) list.append(makeCard(item.name + (item.package_label ? " — " + item.package_label : ""), ["Available units: " + item.quantity_available, "SKU: " + (item.sku || "—"), "Last updated: " + item.updated_at]));
   } catch (e) { $("#inventory-status").textContent = e.message; }
   try {
     const result = await api("stock-orders");
@@ -396,8 +397,8 @@ $("#record-sale").addEventListener("click", async () => {
   const button = $("#record-sale"); button.disabled = true; $("#sale-cart-status").textContent = "Recording customer sale…";
   try {
     const result = await api("sales", "POST", { items, customer_full_name: $("#sale-customer-name").value, customer_phone: $("#sale-customer-phone").value, amount_collected: $("#sale-amount-collected").value, payment_date: $("#sale-payment-date").value, payment_method: $("#sale-payment-method").value, payment_reference: $("#sale-payment-reference").value, customer_notes: $("#sale-note").value });
-    saleCart.clear(); $("#sale-customer-name").value = ""; $("#sale-customer-phone").value = ""; $("#sale-note").value = ""; renderSaleCart();
-    $("#sale-cart-status").textContent = "Sale " + result.data.order_number + " recorded. Your share: " + money(result.data.reseller_earnings, result.data.currency) + ".";
+    saleCart.clear(); $("#sale-customer-name").value = ""; $("#sale-customer-phone").value = ""; $("#sale-amount-collected").value = "0"; $("#sale-payment-date").value = new Date().toISOString().slice(0, 10); $("#sale-payment-method").value = ""; $("#sale-payment-reference").value = ""; $("#sale-note").value = ""; renderSaleCart();
+    $("#sale-cart-status").textContent = "Sale " + result.data.order_number + " recorded. Your share: " + money(result.data.reseller_earnings, result.data.currency) + ". Collected: " + money(result.data.amount_collected, result.data.currency) + ". Customer balance: " + money(result.data.customer_balance, result.data.currency) + ".";
     await loadAccount();
   } catch (error) { $("#sale-cart-status").textContent = error.message; }
   finally { button.disabled = saleCart.size === 0; }
