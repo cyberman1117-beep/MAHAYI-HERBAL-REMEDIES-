@@ -102,13 +102,29 @@ export async function handleAdminOrders(request, env) {
         GROUP BY strftime('%Y-%m', sale_date)
         ORDER BY month
       `).bind(start).all();
+      // Profit figures describe sales recorded in each month and their collection status today.
+      // Customer payments recover stock cost first; only the excess is profit cash.
+      const resellerProfit = await env.DB.prepare(`
+        SELECT strftime('%Y-%m', o.sale_date) AS month,
+               COALESCE(SUM(o.company_earnings), 0) AS stock_cost,
+               COALESCE(SUM(o.reseller_earnings), 0) AS expected_profit,
+               COALESCE(SUM((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id)), 0) AS amount_collected,
+               COALESCE(SUM(MIN(o.company_earnings, (SELECT COALESCE(SUM(p.amount), 0) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id))), 0) AS stock_cost_recovered,
+               COALESCE(SUM(MAX(0, (SELECT COALESCE(SUM(p.amount), 0) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id) - o.company_earnings)), 0) AS profit_collected
+        FROM reseller_orders o
+        WHERE o.order_status <> 'cancelled'
+          AND strftime('%Y-%m', o.sale_date) >= ?
+        GROUP BY strftime('%Y-%m', o.sale_date)
+        ORDER BY month
+      `).bind(start).all();
       return json({
         success: true,
         data: {
           months,
           start_month: start,
           company_sales: companySales.results ?? [],
-          reseller_sales: resellerSales.results ?? []
+          reseller_sales: resellerSales.results ?? [],
+          reseller_profit: resellerProfit.results ?? []
         }
       });
     }
