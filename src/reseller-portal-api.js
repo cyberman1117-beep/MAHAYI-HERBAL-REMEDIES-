@@ -17,7 +17,7 @@ function errorResponse(error) {
 
 async function getReseller(token, env) {
   return env.DB.prepare(
-    "SELECT id, firebase_uid, email, full_name, phone, status, approved_at, pay_later_enabled, created_at FROM resellers WHERE firebase_uid = ?"
+    "SELECT id, firebase_uid, email, full_name, phone, status, approved_at, pay_later_enabled, created_at, residential_street, residential_area, residential_city, residential_province, residential_postal_code, delivery_same_as_residential, delivery_street, delivery_area, delivery_city, delivery_province, delivery_postal_code, delivery_instructions FROM resellers WHERE firebase_uid = ?"
   ).bind(token.sub).first();
 }
 
@@ -62,6 +62,42 @@ export async function handleResellerPortal(request, env) {
       }
       const reseller = await getReseller(token, env);
       return json({ success: true, data: { reseller } }, 201);
+    }
+
+    if (request.method === "POST" && action === "profile") {
+      const body = await request.json();
+      const reseller = await getReseller(token, env);
+      if (!reseller) return json({ success: false, error: "Create your reseller account first." }, 403);
+      const fullName = clean(body.full_name, 160);
+      const phone = clean(body.phone, 40);
+      const residential = {
+        street: clean(body.residential_street, 240),
+        area: clean(body.residential_area, 120),
+        city: clean(body.residential_city, 120),
+        province: clean(body.residential_province, 80),
+        postal: clean(body.residential_postal_code, 16)
+      };
+      const same = body.delivery_same_as_residential === true || body.delivery_same_as_residential === 1 || body.delivery_same_as_residential === "1";
+      const delivery = same ? residential : {
+        street: clean(body.delivery_street, 240),
+        area: clean(body.delivery_area, 120),
+        city: clean(body.delivery_city, 120),
+        province: clean(body.delivery_province, 80),
+        postal: clean(body.delivery_postal_code, 16)
+      };
+      const instructions = clean(body.delivery_instructions, 1000);
+      if (!fullName || !phone || Object.values(residential).some(v => !v) || Object.values(delivery).some(v => !v)) {
+        return json({ success: false, error: "Complete your name, phone number, residential address and delivery address before saving." }, 400);
+      }
+      await env.DB.prepare(`
+        UPDATE resellers SET full_name = ?, phone = ?,
+          residential_street = ?, residential_area = ?, residential_city = ?, residential_province = ?, residential_postal_code = ?,
+          delivery_same_as_residential = ?, delivery_street = ?, delivery_area = ?, delivery_city = ?, delivery_province = ?,
+          delivery_postal_code = ?, delivery_instructions = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(fullName, phone, residential.street, residential.area, residential.city, residential.province, residential.postal,
+        same ? 1 : 0, delivery.street, delivery.area, delivery.city, delivery.province, delivery.postal, instructions, reseller.id).run();
+      return json({ success: true, data: { reseller: await getReseller(token, env) } });
     }
 
     if (action === "me") {
@@ -157,6 +193,10 @@ export async function handleResellerPortal(request, env) {
       }
       if (request.method !== "POST") return json({ success: false, error: "Method not allowed." }, 405);
       const body = await request.json();
+      const requiredProfileFields = [reseller.full_name, reseller.phone, reseller.residential_street, reseller.residential_area, reseller.residential_city, reseller.residential_province, reseller.residential_postal_code, reseller.delivery_street, reseller.delivery_area, reseller.delivery_city, reseller.delivery_province, reseller.delivery_postal_code];
+      if (requiredProfileFields.some(value => !String(value || "").trim())) {
+        return json({ success: false, error: "Complete and save your residential and delivery details in My Account before placing a stock order." }, 400);
+      }
       const fulfilmentMode = body.fulfilment_mode === "pay_later" ? "pay_later" : "upfront";
       if (fulfilmentMode === "pay_later" && Number(reseller.pay_later_enabled) !== 1) return json({ success: false, error: "Pay-later stock access has not been approved for your account." }, 403);
       if (!Array.isArray(body.items) || !body.items.length || body.items.length > 50) return json({ success: false, error: "Choose at least one item for your stock order." }, 400);
@@ -197,7 +237,14 @@ export async function handleResellerPortal(request, env) {
         orderItems.push({ ...item, productId: Number(pkg.product_id), itemUnitsPerPackage, wholesale, customerPrice, resellerShare, lineTotal });
       }
       const orderNumber = "MHR-RS-" + new Date().toISOString().slice(0,10).replace(/-/g,"") + "-" + crypto.randomUUID().slice(0,8).toUpperCase();
-      const created = await env.DB.prepare("INSERT INTO reseller_stock_orders (order_number, reseller_id, currency, total_amount, payment_status, order_status, fulfilment_mode, reseller_notes) VALUES (?, ?, ?, ?, 'pending', 'submitted', ?, ?) RETURNING id").bind(orderNumber, reseller.id, currency, total, fulfilmentMode, clean(body.reseller_notes, 2000)).first();
+      const created = await env.DB.prepare(`
+        INSERT INTO reseller_stock_orders
+          (order_number, reseller_id, currency, total_amount, payment_status, order_status, fulfilment_mode, reseller_notes,
+           delivery_name, delivery_phone, delivery_street, delivery_area, delivery_city, delivery_province, delivery_postal_code, delivery_instructions)
+        VALUES (?, ?, ?, ?, 'pending', 'submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+      `).bind(orderNumber, reseller.id, currency, total, fulfilmentMode, clean(body.reseller_notes, 2000),
+        reseller.full_name, reseller.phone, reseller.delivery_street, reseller.delivery_area, reseller.delivery_city,
+        reseller.delivery_province, reseller.delivery_postal_code, reseller.delivery_instructions || "").first();
       try {
         const statements = [];
         for (const item of orderItems) {
