@@ -213,7 +213,7 @@ export async function handleResellerPortal(request, env) {
       if (!reseller || reseller.status !== "active") return json({ success: false, error: "An approved reseller account is required." }, 403);
       if (request.method === "GET") {
         const orders = await env.DB.prepare(`
-          SELECT o.id, o.order_number, o.customer_full_name, o.customer_phone, o.currency, o.subtotal,
+          SELECT o.id, o.order_number, o.currency, o.subtotal,
                  o.reseller_earnings, o.company_earnings, o.payment_status, o.order_status, o.sale_date, o.created_at,
                  COALESCE((SELECT SUM(p.amount) FROM reseller_customer_payments p WHERE p.reseller_order_id = o.id), 0) AS amount_collected
           FROM reseller_orders o WHERE o.reseller_id = ? ORDER BY o.created_at DESC, o.id DESC LIMIT 100
