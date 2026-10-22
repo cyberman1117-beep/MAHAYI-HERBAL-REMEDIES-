@@ -122,6 +122,9 @@ async function products(request, env, method, id) {
     const row = body.packages[index] || {};
     const label = text(row.package_label);
     const unitsPerPackage = integer(row.units_per_package, 1) || 1;
+    if (/(?:\\b(?:x|by)\\s*\\d+\\b|×\\s*\\d+)/i.test(label) && unitsPerPackage === 1) {
+      return response({ success: false, error: "Package size “" + label + "” appears to include a quantity. Enter only one individual item's size (for example, 100 g) and set the number of individual units in the separate quantity field." }, 400);
+    }
     const stockAmount = amount(row.stock_amount);
     const resaleAmount = amount(row.resale_amount);
     const commission = amount(row.commission);
