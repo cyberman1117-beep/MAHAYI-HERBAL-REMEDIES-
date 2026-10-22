@@ -28,6 +28,7 @@ function setWorkspaceView(view) {
   const valid = ["overview", "catalogue", "sales", "stock", "settlements", "account"];
   if (!valid.includes(view)) view = "overview";
   $("#reseller-overview").hidden = view !== "overview";
+  document.querySelectorAll("[data-workspace-overview]").forEach((panel) => { panel.hidden = view !== "overview"; });
   document.querySelectorAll("[data-workspace-panel]").forEach((panel) => { panel.hidden = panel.dataset.workspacePanel !== view; });
   document.querySelectorAll("[data-reseller-view]").forEach((button) => {
     const active = button.dataset.resellerView === view;
